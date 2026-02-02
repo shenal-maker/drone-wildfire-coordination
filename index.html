@@ -9,6 +9,8 @@
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root {
   --bg:#0a0c10;--bg2:#11141c;--bg3:#181c28;--border:#1e2436;
@@ -249,6 +251,13 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
       Burnbot: RX2 — 1 ac/hr, ≤30° slope, ≤32 km/h wind<br>
       WUI buffer: CAL FIRE standard 2.4 km
     </div>
+  </div>
+
+  <div class="section" id="sec-export" style="display:none">
+    <div class="section-label">Export</div>
+    <button class="btn" onclick="exportCSV()" style="margin-bottom:4px">Download CSV</button>
+    <button class="btn" onclick="exportPDF()">Download PDF Report</button>
+    <div class="caption" style="margin-top:6px">CSV includes strategy comparison, efficiency metrics, and per-run raw data. PDF includes summary tables and experiment parameters.</div>
   </div>
 </div>
 
@@ -1243,6 +1252,7 @@ function renderResults() {
   const { results, treatmentMaps } = experimentResults;
   document.getElementById('sec-results').style.display = '';
   document.getElementById('sec-map-strat').style.display = '';
+  document.getElementById('sec-export').style.display = '';
 
   // --- Main comparison table ---
   const stratNames = ['No Treatment', ...Object.keys(results).filter(n => n !== 'No Treatment')];
@@ -1405,6 +1415,139 @@ function showTreatmentMap(stratName) {
   const info = document.getElementById('map-strat-info');
   if (info) info.textContent = `${stratName}: ${nCells} cells treated (${acres.toFixed(0)} acres). White lines = firebreak edges.`;
   log(`Showing treatment map: ${stratName} (${nCells} cells, ${acres.toFixed(0)} acres)`);
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT CSV
+// ═══════════════════════════════════════════════════════
+function exportCSV() {
+  if (!experimentResults) return;
+  const { results, fleetSize, budget } = experimentResults;
+  const stratNames = Object.keys(results);
+
+  // Strategy comparison CSV
+  let csv = 'Strategy,Mean Damage,SD Damage,Mean WUI Damage,SD WUI,Mean Wildland Burned,SD Wildland,Acres Treated,Damage Reduction %,WUI Reduction %,WUI Saved/Acre,Wildland Cost/WUI\n';
+  for (const n of stratNames) {
+    const r = results[n];
+    csv += `"${n}",${r.meanDamage.toFixed(2)},${r.sdDamage.toFixed(2)},${r.meanWui.toFixed(2)},${r.sdWui.toFixed(2)},${r.meanWildland.toFixed(2)},${r.sdWildland.toFixed(2)},${r.acresTreated.toFixed(0)},${r.damageReduction.toFixed(2)},${r.wuiReduction.toFixed(2)},${r.wuiSavedPerAcre.toFixed(4)},${r.wildlandCost.toFixed(4)}\n`;
+  }
+
+  // Per-run data for non-baseline strategies
+  csv += '\n\nPer-Run Data\nStrategy,Run,Stratum,Weather,Total Damage,WUI Damage,Wildland Burned,Ticks\n';
+  for (const n of stratNames) {
+    const r = results[n];
+    if (!r.runs) continue;
+    r.runs.forEach((run, i) => {
+      csv += `"${n}",${i+1},${run.stratum || ''},${run.weather || ''},${run.totalDamage},${run.wuiDamage},${run.wildlandBurned},${run.ticks}\n`;
+    });
+  }
+
+  // Experiment metadata
+  csv += `\n\nMetadata\nExperiment,${currentExp}\nFleet Size,${fleetSize}\nBudget (acres),${budget}\nCells,${cells.length}\nCell Size (m),${CELL_SIZE_M.toFixed(0)}\nCell Area (acres),${CELL_AREA_ACRES.toFixed(1)}\nTimestamp,${new Date().toISOString()}\n`;
+
+  download('experiment_results.csv', csv, 'text/csv');
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPORT PDF
+// ═══════════════════════════════════════════════════════
+function exportPDF() {
+  if (!experimentResults) return;
+  const { results, fleetSize, budget } = experimentResults;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const stratNames = Object.keys(results);
+  let y = 20;
+
+  // Title
+  doc.setFontSize(18);
+  doc.text('Burnbot Treatment Optimizer — Experiment Results', 14, y);
+  y += 10;
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(`Experiment ${currentExp} | Fleet: ${fleetSize} Burnbots | Budget: ${budget} acres | ${cells.length} cells at ${CELL_SIZE_M.toFixed(0)}m | ${new Date().toLocaleDateString()}`, 14, y);
+  y += 12;
+
+  // Research question
+  doc.setTextColor(0);
+  doc.setFontSize(9);
+  doc.text('Research Question: Given N treatment robots with slope, speed, and time constraints,', 14, y); y += 4;
+  doc.text('which spatial allocation strategy for prescribed burns maximizes wildfire risk reduction?', 14, y); y += 10;
+
+  // Strategy comparison table
+  doc.setFontSize(11);
+  doc.text('Strategy Comparison', 14, y);
+  y += 2;
+
+  const tableData = stratNames.map(n => {
+    const r = results[n];
+    return [n, r.meanDamage.toFixed(1), '±' + r.sdDamage.toFixed(1), r.meanWui.toFixed(1), r.meanWildland.toFixed(0), r.acresTreated.toFixed(0), r.damageReduction.toFixed(1) + '%'];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['Strategy', 'Damage', '±SD', 'WUI Dmg', 'Wildland', 'Acres', 'Reduction']],
+    body: tableData,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [30, 36, 54], textColor: [200, 200, 200] },
+    theme: 'grid',
+    margin: { left: 14, right: 14 },
+  });
+
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Efficiency table
+  doc.setFontSize(11);
+  doc.text('Efficiency Metrics', 14, y);
+  y += 2;
+
+  const effData = stratNames.filter(n => n !== 'No Treatment').map(n => {
+    const r = results[n];
+    return [n, r.wuiSavedPerAcre.toFixed(4), r.wildlandCost.toFixed(3), r.wuiReduction.toFixed(1) + '%'];
+  });
+
+  doc.autoTable({
+    startY: y,
+    head: [['Strategy', 'WUI Saved/Acre', 'Wildland Cost/WUI', 'WUI Reduction']],
+    body: effData,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [30, 36, 54], textColor: [200, 200, 200] },
+    theme: 'grid',
+    margin: { left: 14, right: 14 },
+  });
+
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Parameters
+  doc.setFontSize(11);
+  doc.text('Simulation Parameters', 14, y); y += 6;
+  doc.setFontSize(8);
+  const params = [
+    `Fire model: Simplified Rothermel (1972) — Base ROS 1.2 km/h, SH5 fuel`,
+    `Treatment effect: 35-90% spread reduction (conditional on wind/moisture)`,
+    `Weather: 70% normal summer / 30% Diablo wind events`,
+    `Ignition: Stratified sampling from NASA FIRMS hotspot density (Q1:10%, Q2:20%, Q3:30%, Q4:40%)`,
+    `Slope: ≤20° operable, 20-30° marginal, >30° infeasible (Burnbot RX2 spec)`,
+    `WUI buffer: 2.4 km (CAL FIRE standard), 8 communities`,
+    `Value-at-risk: WUI up to 10, Timber 3, Wildland 1 (Thompson et al. 2022)`,
+  ];
+  for (const p of params) { doc.text(p, 14, y); y += 4; }
+
+  y += 4;
+  doc.setFontSize(8);
+  doc.setTextColor(120);
+  doc.text('References: Rothermel (1972), Pais et al. (2021), Thompson et al. (2022), Andrews (2018), NWCG PMS 437', 14, y);
+
+  doc.save('experiment_report.pdf');
+}
+
+function download(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ═══════════════════════════════════════════════════════

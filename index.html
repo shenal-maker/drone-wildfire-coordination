@@ -105,13 +105,53 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
   </div>
 
   <div class="section">
-    <div class="section-label">Experiment</div>
+    <div class="section-label">Experiment Configuration</div>
+
+    <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:8px">FLEET</div>
     <div class="row"><span>Fleet size</span><span class="v"><input id="fleet-size" type="number" min="2" max="12" value="6" style="width:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;border-radius:4px;padding:2px"> Burnbots</span></div>
-    <div class="row"><span>MC runs</span><span class="v">100 per strategy</span></div>
     <div class="row"><span>Campaign</span><span class="v">2 weeks (140 hrs/unit)</span></div>
-    <button class="btn" id="btn-run" onclick="runExperiment()">Run Experiment</button>
+    <div class="row"><span>MC runs</span><span class="v">100 per strategy</span></div>
+
+    <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin:10px 0 6px">WEATHER SCENARIO</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="radio" name="weather" value="mixed" checked style="accent-color:var(--cyan)"> Mixed (70% normal / 30% Diablo)
+      </label>
+      <label style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="radio" name="weather" value="normal"> Normal only (summer)
+      </label>
+      <label style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="radio" name="weather" value="diablo"> Diablo wind only
+      </label>
+    </div>
+
+    <div style="font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin:10px 0 6px">STRATEGIES TO RUN</div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <label class="strat-check" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" value="Housing Protection" checked style="accent-color:var(--purple)"> Housing Protection
+      </label>
+      <label class="strat-check" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" value="Fire Transmission" checked style="accent-color:var(--orange)"> Fire Transmission
+      </label>
+      <label class="strat-check" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" value="Highest Fuel" checked style="accent-color:var(--red)"> Highest Fuel
+      </label>
+      <label class="strat-check" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" value="DPV-Optimal" checked style="accent-color:var(--cyan)"> DPV-Optimal
+      </label>
+      <label class="strat-check" style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" value="Constrained DPV" checked style="accent-color:var(--green)"> Constrained DPV ★
+      </label>
+    </div>
+
+    <button class="btn" id="btn-run" onclick="runExperiment()" style="margin-top:10px">Run Experiment</button>
     <div class="progress-bar" id="prog-wrap" style="display:none"><div class="progress-fill" id="prog"></div></div>
     <div id="run-status" style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace"></div>
+  </div>
+
+  <div class="section" id="sec-live-chart" style="display:none">
+    <div class="section-label">Live — Damage per Run</div>
+    <div class="chart-box" id="chart-live" style="height:160px"></div>
   </div>
 
   <div class="section" id="sec-results" style="display:none">
@@ -143,6 +183,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
       <div class="leg"><div class="dot" style="background:#444"></div>Burned</div>
       <div class="leg"><div class="dot" style="background:var(--cyan)"></div>FIRMS</div>
       <div class="leg"><div class="dot" style="background:#0af5"></div>Treated</div>
+      <div class="leg"><div class="dot" style="background:#fff;width:10px;height:2px;border-radius:0"></div>Firebreak</div>
     </div>
   </div>
 
@@ -629,8 +670,14 @@ function generateIgnitionSet(n = 100) {
 // ═══════════════════════════════════════════════════════
 //  WEATHER SAMPLING (per Monte Carlo run)
 // ═══════════════════════════════════════════════════════
-function sampleWeather() {
-  const isDiablo = Math.random() < 0.30;
+function getWeatherMode() {
+  const r = document.querySelector('input[name="weather"]:checked');
+  return r ? r.value : 'mixed';
+}
+
+function sampleWeather(forceMode) {
+  const mode = forceMode || getWeatherMode();
+  const isDiablo = mode === 'diablo' ? true : mode === 'normal' ? false : Math.random() < 0.30;
   if (isDiablo) {
     return {
       deadFuelMoisture: 0.03 + Math.random() * 0.02,  // 3-5%
@@ -682,7 +729,29 @@ function cellColor(c) {
   return [170, 30, 30, 40 + f * 60];
 }
 
+function buildFirebreakPaths() {
+  // Build line segments along edges of treated cells (borders with untreated neighbors)
+  const paths = [];
+  const half = G.step / 2;
+  for (const c of cells) {
+    if (!c.treated) continue;
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const ni = RC[`${c.row+dr},${c.col+dc}`];
+      if (ni !== undefined && cells[ni].treated) continue; // both treated, no edge
+      // Draw a line segment on this edge
+      let p1, p2;
+      if (dr === -1) { p1 = [c.lng - half, c.lat + half]; p2 = [c.lng + half, c.lat + half]; }
+      else if (dr === 1) { p1 = [c.lng - half, c.lat - half]; p2 = [c.lng + half, c.lat - half]; }
+      else if (dc === -1) { p1 = [c.lng - half, c.lat - half]; p2 = [c.lng - half, c.lat + half]; }
+      else { p1 = [c.lng + half, c.lat - half]; p2 = [c.lng + half, c.lat + half]; }
+      paths.push({ path: [p1, p2] });
+    }
+  }
+  return paths;
+}
+
 function renderDeck() {
+  const firebreaks = buildFirebreakPaths();
   const layers = [
     new deck.ScatterplotLayer({
       id: 'grid', data: cells,
@@ -693,6 +762,16 @@ function renderDeck() {
       pickable: true,
       onClick: ({object}) => { if (object) igniteCell(object.idx); },
       updateTriggers: { getFillColor: [Date.now()] }
+    }),
+    new deck.PathLayer({
+      id: 'firebreaks', data: firebreaks,
+      getPath: d => d.path,
+      getColor: [255, 255, 255, 200],
+      getWidth: 80,
+      widthMinPixels: 1.5,
+      widthMaxPixels: 4,
+      capRounded: true,
+      updateTriggers: { getPath: [Date.now()] }
     }),
     new deck.ScatterplotLayer({
       id: 'firms', data: FIRMS,
@@ -894,6 +973,30 @@ async function runExperiment() {
   const weathers = [];
   for (let i = 0; i < N; i++) weathers.push(sampleWeather());
 
+  // Get selected strategies
+  const allStrategies = [
+    { name: 'Housing Protection', fn: strategyHousingProtection },
+    { name: 'Fire Transmission', fn: strategyFireTransmission },
+    { name: 'Highest Fuel', fn: strategyHighestFuel },
+    { name: 'DPV-Optimal', fn: strategyDPV },
+    { name: 'Constrained DPV', fn: strategyConstrainedDPV },
+  ];
+  const selectedNames = new Set();
+  document.querySelectorAll('.strat-check input:checked').forEach(cb => selectedNames.add(cb.value));
+  const strategies = allStrategies.filter(s => selectedNames.has(s.name));
+
+  if (strategies.length === 0) {
+    status.textContent = 'Select at least one strategy.';
+    btn.disabled = false; btn.textContent = 'Run Experiment';
+    return;
+  }
+
+  // Init live chart
+  document.getElementById('sec-live-chart').style.display = '';
+  const liveData = {}; // stratName -> [{run, damage}]
+  liveData['No Treatment'] = [];
+  for (const s of strategies) liveData[s.name] = [];
+
   // Run baseline (no treatment)
   status.textContent = 'Running baseline (no treatment)...';
   prog.style.width = '0%';
@@ -901,18 +1004,12 @@ async function runExperiment() {
 
   const baselineResults = [];
   for (let i = 0; i < N; i++) {
-    baselineResults.push(simulateFire(ignitions[i].idx, weathers[i], null));
-    if (i % 10 === 0) { prog.style.width = (i/N*10) + '%'; await sleep(1); }
+    const res = simulateFire(ignitions[i].idx, weathers[i], null);
+    baselineResults.push(res);
+    liveData['No Treatment'].push({ run: i + 1, damage: res.totalDamage });
+    if (i % 10 === 0) { prog.style.width = (i/N*10) + '%'; renderLiveChart(liveData, strategies); await sleep(1); }
   }
-
-  // Define strategies
-  const strategies = [
-    { name: 'Housing Protection', fn: strategyHousingProtection },
-    { name: 'Fire Transmission', fn: strategyFireTransmission },
-    { name: 'Highest Fuel', fn: strategyHighestFuel },
-    { name: 'DPV-Optimal', fn: strategyDPV },
-    { name: 'Constrained DPV', fn: strategyConstrainedDPV },
-  ];
+  renderLiveChart(liveData, strategies);
 
   const results = {};
   const treatmentMaps = {};
@@ -935,9 +1032,11 @@ async function runExperiment() {
       res.stratum = ignitions[i].stratum;
       res.weather = weathers[i].event;
       runs.push(res);
-      if (i % 10 === 0) {
-        const pct = 10 + (s * 18) + (i / N * 18);
+      liveData[strat.name].push({ run: i + 1, damage: res.totalDamage });
+      if (i % 5 === 0) {
+        const pct = 10 + (s * (90 / strategies.length)) + (i / N * (90 / strategies.length));
         prog.style.width = pct + '%';
+        renderLiveChart(liveData, strategies);
         await sleep(1);
       }
     }
@@ -1009,6 +1108,74 @@ function mean(arr) { return arr.length ? arr.reduce((a,b) => a+b, 0) / arr.lengt
 function stddev(arr) { const m = mean(arr); return Math.sqrt(mean(arr.map(x => (x-m)*(x-m)))); }
 
 // ═══════════════════════════════════════════════════════
+//  LIVE CHART (updates during MC run)
+// ═══════════════════════════════════════════════════════
+const STRAT_COLORS = {
+  'No Treatment': '#666',
+  'Housing Protection': '#7c4dff',
+  'Fire Transmission': '#ff8c42',
+  'Highest Fuel': '#f44336',
+  'DPV-Optimal': '#00e5ff',
+  'Constrained DPV': '#00e676',
+};
+
+function renderLiveChart(liveData, strategies) {
+  const container = document.getElementById('chart-live');
+  container.innerHTML = '';
+  const W = container.clientWidth - 4, H = 150;
+  const margin = { t: 8, r: 8, b: 28, l: 45 };
+
+  // Compute running averages for each series
+  const series = {};
+  for (const key of Object.keys(liveData)) {
+    const pts = liveData[key];
+    if (pts.length === 0) continue;
+    let sum = 0;
+    series[key] = pts.map((p, i) => { sum += p.damage; return { run: p.run, avg: sum / (i + 1) }; });
+  }
+
+  const allPts = Object.values(series).flat();
+  if (allPts.length === 0) return;
+
+  const svg = d3.select(container).append('svg').attr('width', W).attr('height', H);
+  const x = d3.scaleLinear().domain([1, 100]).range([margin.l, W - margin.r]);
+  const yMax = d3.max(allPts, d => d.avg) * 1.15 || 1;
+  const y = d3.scaleLinear().domain([0, yMax]).range([H - margin.b, margin.t]);
+
+  const line = d3.line().x(d => x(d.run)).y(d => y(d.avg)).curve(d3.curveMonotoneX);
+
+  for (const [name, pts] of Object.entries(series)) {
+    svg.append('path').datum(pts)
+      .attr('d', line).attr('fill', 'none')
+      .attr('stroke', STRAT_COLORS[name] || '#888')
+      .attr('stroke-width', name === 'No Treatment' ? 1 : 1.5)
+      .attr('stroke-dasharray', name === 'No Treatment' ? '3,3' : 'none')
+      .attr('opacity', 0.9);
+  }
+
+  svg.append('g').attr('transform', `translate(0,${H - margin.b})`).call(d3.axisBottom(x).ticks(5).tickFormat(d => d))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px');
+  svg.append('g').attr('transform', `translate(${margin.l},0)`).call(d3.axisLeft(y).ticks(4))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px');
+  svg.selectAll('.domain,.tick line').style('stroke', '#1e2436');
+
+  svg.append('text').attr('x', W / 2).attr('y', H - 1).text('Run #').style('fill', '#4a5068').style('font-size', '8px').style('text-anchor', 'middle').style('font-family', 'JetBrains Mono');
+  svg.append('text').attr('transform', 'rotate(-90)').attr('x', -H / 2).attr('y', 10).text('Running Avg Damage').style('fill', '#4a5068').style('font-size', '8px').style('text-anchor', 'middle').style('font-family', 'JetBrains Mono');
+
+  // Legend
+  let ly = margin.t + 2;
+  for (const name of Object.keys(series)) {
+    const short = name.replace('Housing Protection', 'Housing').replace('Fire Transmission', 'Transmit').replace('Highest Fuel', 'Fuel').replace('DPV-Optimal', 'DPV').replace('Constrained DPV', 'C-DPV').replace('No Treatment', 'None');
+    svg.append('line').attr('x1', margin.l + 4).attr('x2', margin.l + 16).attr('y1', ly).attr('y2', ly)
+      .attr('stroke', STRAT_COLORS[name] || '#888').attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', name === 'No Treatment' ? '3,3' : 'none');
+    svg.append('text').attr('x', margin.l + 19).attr('y', ly + 3).text(short)
+      .style('fill', '#7a8299').style('font-size', '7px').style('font-family', 'JetBrains Mono');
+    ly += 11;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
 //  RENDER RESULTS
 // ═══════════════════════════════════════════════════════
 function renderResults() {
@@ -1018,7 +1185,7 @@ function renderResults() {
   document.getElementById('sec-map-strat').style.display = '';
 
   // --- Main comparison table ---
-  const stratNames = ['No Treatment', 'Housing Protection', 'Fire Transmission', 'Highest Fuel', 'DPV-Optimal', 'Constrained DPV'];
+  const stratNames = ['No Treatment', ...Object.keys(results).filter(n => n !== 'No Treatment')];
   let bestName = '';
   let bestDmg = Infinity;
   for (const n of stratNames) {
@@ -1098,12 +1265,12 @@ function renderDamageChart(results, names) {
   const x = d3.scaleBand().domain(data.map(d => d.name)).range([margin.l, W - margin.r]).padding(0.3);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.mean + d.sd) * 1.1]).range([H - margin.b, margin.t]);
 
-  const colors = ['#666', '#7c4dff', '#ff8c42', '#f44336', '#00e5ff', '#00e676'];
+  const cArr = names.filter(n => results[n]).map(n => STRAT_COLORS[n] || '#888');
 
   svg.selectAll('rect').data(data).join('rect')
     .attr('x', d => x(d.name)).attr('y', d => y(d.mean))
     .attr('width', x.bandwidth()).attr('height', d => H - margin.b - y(d.mean))
-    .attr('fill', (d, i) => colors[i]).attr('rx', 2);
+    .attr('fill', (d, i) => cArr[i]).attr('rx', 2);
 
   // Error bars
   svg.selectAll('.err').data(data).join('line').attr('class', 'err')
@@ -1134,11 +1301,9 @@ function renderParetoChart(results, names) {
   const x = d3.scaleLinear().domain([0, d3.max(data, d => d.wildland) * 1.1]).range([margin.l, W - margin.r]);
   const y = d3.scaleLinear().domain([0, d3.max(data, d => d.wui) * 1.1]).range([H - margin.b, margin.t]);
 
-  const colors = { 'Housing Protection': '#7c4dff', 'Fire Transmission': '#ff8c42', 'Highest Fuel': '#f44336', 'DPV-Optimal': '#00e5ff', 'Constrained DPV': '#00e676', 'None': '#666' };
-
   svg.selectAll('circle').data(data).join('circle')
     .attr('cx', d => x(d.wildland)).attr('cy', d => y(d.wui))
-    .attr('r', 5).attr('fill', d => colors[d.name] || '#888');
+    .attr('r', 5).attr('fill', d => STRAT_COLORS[d.name] || '#888');
 
   svg.selectAll('.lbl').data(data).join('text').attr('class', 'lbl')
     .attr('x', d => x(d.wildland) + 7).attr('y', d => y(d.wui) + 3)

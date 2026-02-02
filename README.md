@@ -211,8 +211,16 @@ python3 -m http.server 8000
 ## Implementation Status
 
 - [x] Step 1: Landscape grid + Rothermel fire spread (interactive)
-- [ ] Step 2: Treatment strategies + Monte Carlo + results/charts
-- [ ] Step 3: Export CSV + PDF
+- [x] Step 2: Treatment strategies + Monte Carlo + results/charts
+- [x] Step 2b: Experiment config panel, live damage chart, firebreak visualization, methodology captions
+- [ ] Experiment 2: Sub-landscape zoom (Paradise area, 100m cells)
+
+## Experiments
+
+| Experiment | Scale | Cell Size | Grid | Research Focus |
+|---|---|---|---|---|
+| **Exp 1** (current) | Regional (Butte+Plumas County) | ~1.1 km (~250 ac) | ~5,400 cells | Strategy comparison at landscape scale — mirrors real-world constraint that <2% of land gets treated |
+| **Exp 2** (planned) | Local (Paradise area, ~20×20 km) | ~100m (~2.5 ac) | ~40,000 cells | Higher-resolution strategy discrimination — treatment covers meaningful fraction of landscape |
 
 ## License
 

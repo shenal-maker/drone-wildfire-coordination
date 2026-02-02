@@ -53,6 +53,7 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
 .strat-select{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .strat-chip{font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'JetBrains Mono',monospace}
 .strat-chip.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08)}
+.exp-toggle.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08)}
 .caption{font-size:10px;color:var(--text2);font-family:'Outfit',sans-serif;line-height:1.5;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.02);border-left:2px solid var(--border);border-radius:0 4px 4px 0}
 .caption em{color:var(--muted);font-style:normal}
 .caption strong{color:var(--text);font-weight:600}
@@ -62,14 +63,18 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
 <div class="app">
 <div class="sidebar">
   <div class="header">
-    <div class="logo">EXPERIMENT 1</div>
-    <div class="logo-sub">Burnbot Fleet Treatment Optimizer</div>
+    <div class="logo" id="exp-title">EXPERIMENT 1</div>
+    <div class="logo-sub" id="exp-sub">Regional Scale — Butte & Plumas County</div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button class="btn exp-toggle on" data-exp="1" onclick="switchExperiment(1)" style="padding:6px 10px;width:auto;font-size:10px">Exp 1: Regional</button>
+      <button class="btn exp-toggle" data-exp="2" onclick="switchExperiment(2)" style="padding:6px 10px;width:auto;font-size:10px">Exp 2: Paradise Zoom</button>
+    </div>
   </div>
 
   <div class="section">
     <div class="section-label">Landscape</div>
     <div class="row"><span>Grid</span><span class="v" id="i-grid">—</span></div>
-    <div class="row"><span>Cell size</span><span class="v">~1.1 km (~250 ac)</span></div>
+    <div class="row"><span>Cell size</span><span class="v" id="i-cellsize">~1.1 km (~250 ac)</span></div>
     <div class="row"><span>Operable (≤30°)</span><span class="v" id="i-op">—</span></div>
     <div class="row"><span>Marginal (20-30°)</span><span class="v" id="i-marg">—</span></div>
     <div class="row"><span>Inoperable (>30°)</span><span class="v" id="i-inop">—</span></div>
@@ -285,10 +290,17 @@ const COMMUNITIES = [
 const WUI_BUFFER_KM = 2.4;
 const WUI_BUFFER_DEG = WUI_BUFFER_KM / 111.32; // approximate
 
-// Grid config
-const G = { lngMin:-121.85, lngMax:-120.95, latMin:39.65, latMax:40.25, step:0.01 };
-const CELL_SIZE_M = G.step * 111320; // ~1113m
-const CELL_AREA_ACRES = (CELL_SIZE_M * CELL_SIZE_M) / 4047; // ~306 acres
+// Grid configs per experiment
+const EXP_CONFIGS = {
+  1: { lngMin:-121.85, lngMax:-120.95, latMin:39.65, latMax:40.25, step:0.01,
+       label:'EXPERIMENT 1', sub:'Regional Scale — Butte & Plumas County', zoom:9, center:[-121.35,39.95] },
+  2: { lngMin:-121.72, lngMax:-121.50, latMin:39.70, latMax:39.86, step:0.001,
+       label:'EXPERIMENT 2', sub:'Paradise Sub-Landscape — 100m cells', zoom:12.5, center:[-121.61,39.78] },
+};
+let currentExp = 1;
+let G = { ...EXP_CONFIGS[1] };
+let CELL_SIZE_M = G.step * 111320;
+let CELL_AREA_ACRES = (CELL_SIZE_M * CELL_SIZE_M) / 4047;
 
 // Rothermel parameters for SH5 (high-load, dry-climate shrub)
 const ROTHERMEL = {
@@ -445,6 +457,7 @@ function updateSidebar() {
   const wui = cells.filter(c => c.wuiWeight > 0).length;
   const risk = cells.filter(c => c.ignProb > 0.03).length;
 
+  document.getElementById('i-cellsize').textContent = CELL_SIZE_M > 500 ? `~${(CELL_SIZE_M/1000).toFixed(1)} km (~${CELL_AREA_ACRES.toFixed(0)} ac)` : `~${CELL_SIZE_M.toFixed(0)}m (~${CELL_AREA_ACRES.toFixed(1)} ac)`;
   document.getElementById('i-grid').textContent = `${nRows}×${nCols} (${cells.length})`;
   document.getElementById('i-op').textContent = `${op} (${(op/cells.length*100)|0}%)`;
   document.getElementById('i-marg').textContent = `${ma} (${(ma/cells.length*100)|0}%)`;
@@ -471,7 +484,8 @@ function updateSidebar() {
 //   Andrews (2018) "The Rothermel surface fire spread model and associated developments"
 //   NWCG PMS 437 Surface Fire Behavior Lookup Tables
 
-const TICK_REAL_MINUTES = 30; // each simulation tick = 30 min real time
+// Tick duration scales with cell size so spread probabilities stay in [0,1]
+function getTickMinutes() { return CELL_SIZE_M > 500 ? 30 : 5; }
 const TICK_MS = 350;          // visual animation speed
 
 function moistureDamping(deadFM) {
@@ -522,7 +536,7 @@ function spreadProb(cell, neighbor, params) {
 
   // Convert to spread probability per tick
   // tick = 30 min, cell = ~1.1km → prob = ros * 0.5hr / 1.1km
-  let prob = ros * (TICK_REAL_MINUTES / 60) / (CELL_SIZE_M / 1000);
+  let prob = ros * (getTickMinutes() / 60) / (CELL_SIZE_M / 1000);
 
   // Treatment: conditional reduction
   if (neighbor.treated) {
@@ -546,7 +560,7 @@ function simulateFire(ignitionIdx, params, treatedSet) {
   burning[ignitionIdx] = 1;
   let activeFires = 1;
   let ticks = 0;
-  const maxTicks = 200; // ~100 hours max
+  const maxTicks = CELL_SIZE_M > 500 ? 200 : 600; // scale with cell size
 
   while (activeFires > 0 && ticks < maxTicks) {
     ticks++;
@@ -872,9 +886,9 @@ function strategyFireTransmission(budget) {
 
 function strategyDPV(budget) {
   // Compute DPV: run quick fire sims, score each cell by damage prevented if treated
-  // Use 20 quick sims for DPV estimation
+  const dpvSims = cells.length > 10000 ? 8 : 20;
   const dpvScores = new Float32Array(cells.length);
-  const sampleIgnitions = generateIgnitionSet(20);
+  const sampleIgnitions = generateIgnitionSet(dpvSims);
 
   // Baseline: run sims with no treatment
   const baselines = [];
@@ -908,10 +922,9 @@ function strategyDPV(budget) {
 }
 
 function strategyConstrainedDPV(budget) {
-  // Like DPV but accounts for travel time between selected parcels
-  // Greedy: pick highest DPV cell, then next highest that doesn't cost too much travel
+  const dpvSims = cells.length > 10000 ? 8 : 20;
   const dpvScores = new Float32Array(cells.length);
-  const sampleIgnitions = generateIgnitionSet(20);
+  const sampleIgnitions = generateIgnitionSet(dpvSims);
   const baselines = [];
   for (const ign of sampleIgnitions) {
     const weather = sampleWeather();
@@ -1010,7 +1023,7 @@ async function runExperiment() {
 
   const fleetSize = parseInt(document.getElementById('fleet-size').value) || 6;
   const budget = fleetSize * 140; // acres
-  const N = 100;
+  const N = cells.length > 10000 ? 30 : 100; // fewer runs for large grids
 
   // Generate fixed ignition set
   status.textContent = 'Generating ignition set...';
@@ -1143,7 +1156,7 @@ async function runExperiment() {
   experimentResults = { results, treatmentMaps, ignitions, weathers, baselineResults, fleetSize, budget };
 
   prog.style.width = '100%';
-  status.textContent = `Done. ${N} runs × ${strategies.length} strategies.`;
+  status.textContent = `Done. ${N} runs × ${strategies.length + 1} conditions (incl. baseline). ${cells.length} cells.`;
   btn.disabled = false;
   btn.textContent = 'Run Experiment';
 
@@ -1392,6 +1405,45 @@ function showTreatmentMap(stratName) {
   const info = document.getElementById('map-strat-info');
   if (info) info.textContent = `${stratName}: ${nCells} cells treated (${acres.toFixed(0)} acres). White lines = firebreak edges.`;
   log(`Showing treatment map: ${stratName} (${nCells} cells, ${acres.toFixed(0)} acres)`);
+}
+
+// ═══════════════════════════════════════════════════════
+//  EXPERIMENT SWITCHER
+// ═══════════════════════════════════════════════════════
+function switchExperiment(exp) {
+  if (exp === currentExp) return;
+  currentExp = exp;
+  const cfg = EXP_CONFIGS[exp];
+  Object.assign(G, cfg);
+  CELL_SIZE_M = G.step * 111320;
+  CELL_AREA_ACRES = (CELL_SIZE_M * CELL_SIZE_M) / 4047;
+
+  // Update header
+  document.getElementById('exp-title').textContent = cfg.label;
+  document.getElementById('exp-sub').textContent = cfg.sub;
+  document.querySelectorAll('.exp-toggle').forEach(b => b.classList.toggle('on', +b.dataset.exp === exp));
+
+  // Reset state
+  if (fireInterval) { clearInterval(fireInterval); fireInterval = null; }
+  cells.length = 0;
+  for (const k of Object.keys(RC)) delete RC[k];
+  nCols = 0; nRows = 0;
+  experimentResults = null;
+  document.getElementById('sec-results').style.display = 'none';
+  document.getElementById('sec-map-strat').style.display = 'none';
+  document.getElementById('sec-live-chart').style.display = 'none';
+  document.getElementById('fire-log').textContent = '';
+
+  // Rebuild
+  buildGrid();
+  renderDeck();
+  map.flyTo({ center: cfg.center, zoom: cfg.zoom, duration: 1200 });
+
+  // Update cell size display
+  const csLabel = exp === 2 ? '~100m (~2.5 ac)' : '~1.1 km (~250 ac)';
+  document.querySelector('.section .row .v').textContent; // skip — just update sidebar
+  log(`Switched to ${cfg.label}: ${cells.length} cells, ${CELL_SIZE_M.toFixed(0)}m/cell, ${CELL_AREA_ACRES.toFixed(1)} ac/cell`);
+  log(`Operable: ${cells.filter(c=>c.operable!=='no').length}, WUI: ${cells.filter(c=>c.wuiWeight>0).length}`);
 }
 
 // ═══════════════════════════════════════════════════════

@@ -53,6 +53,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
 .strat-select{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .strat-chip{font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'JetBrains Mono',monospace}
 .strat-chip.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08)}
+.caption{font-size:10px;color:var(--text2);font-family:'Outfit',sans-serif;line-height:1.5;margin-top:6px;padding:6px 8px;background:rgba(255,255,255,.02);border-left:2px solid var(--border);border-radius:0 4px 4px 0}
+.caption em{color:var(--muted);font-style:normal}
+.caption strong{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -152,24 +155,68 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
   <div class="section" id="sec-live-chart" style="display:none">
     <div class="section-label">Live — Damage per Run</div>
     <div class="chart-box" id="chart-live" style="height:160px"></div>
+    <div class="caption">
+      Each line shows the <strong>running average of damage-weighted burn area</strong> as Monte Carlo runs complete.
+      Lines converge as more runs accumulate — stable convergence by ~60-80 runs indicates sufficient sample size.
+      The dashed baseline (no treatment) provides the control.
+      Weather is sampled independently per run from a fire-season distribution <em>(70% normal summer, 30% Diablo wind events — Moritz et al. 2010)</em>.
+    </div>
+  </div>
+
+  <div class="section" id="sec-map-strat" style="display:none">
+    <div class="section-label">Burnbot Treatment Map</div>
+    <div class="caption" style="margin-bottom:8px">
+      <strong>White lines on the map show firebreak locations</strong> — where Burnbot units performed prescribed burns.
+      Each strategy places treatments differently. Click a strategy below to see its spatial pattern.
+      Treatment budget = fleet size × 140 hrs at 1 acre/hr. Scattered strategies lose hours to travel (20 km/h between parcels).
+    </div>
+    <div class="strat-select" id="strat-chips"></div>
+    <div id="map-strat-info" style="font-size:10px;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace"></div>
   </div>
 
   <div class="section" id="sec-results" style="display:none">
     <div class="section-label">Results — Strategy Comparison</div>
     <div id="results-table-wrap"></div>
+    <div class="caption">
+      <strong>Damage</strong> = Σ(burned cells × value-at-risk), where WUI cells carry weight up to 10 and wildland = 1 <em>(Thompson et al. 2022)</em>.
+      <strong>Reduction</strong> = % decrease vs. no-treatment baseline.
+      All strategies share the same 100 ignition points (paired comparison) and weather draws, isolating treatment placement as the sole variable.
+      Green row = lowest mean damage.
+    </div>
+
     <div class="section-label" style="margin-top:12px">Damage by Strategy</div>
     <div class="chart-box" id="chart-damage" style="height:160px"></div>
+    <div class="caption">
+      Bar height = mean damage across 100 runs. Error bars = ±1 standard deviation.
+      Fire spread uses a <strong>simplified Rothermel model</strong> <em>(Rothermel 1972; Andrews 2018)</em>:
+      ROS = baseROS × moisture damping × slope factor × wind alignment × fuel load.
+      Treatment reduces spread probability by 35–90% depending on wind speed and fuel moisture <em>(meta-analysis benchmark: 62–72%, Fernandes &amp; Botelho 2003)</em>.
+    </div>
+
     <div class="section-label" style="margin-top:12px">Pareto Front (WUI vs Wildland)</div>
     <div class="chart-box" id="chart-pareto" style="height:160px"></div>
+    <div class="caption">
+      The <strong>fundamental tradeoff</strong>: protecting communities (low WUI damage, Y-axis) vs. preserving wildland (low wildland burn, X-axis).
+      Points closer to the bottom-left are better on both axes. The Pareto front reveals which strategies are dominated.
+      <em>This tradeoff framework follows Pais et al. (2021) "Downstream Protection Value" and Thompson et al. (2022) risk-based prioritization.</em>
+    </div>
+
     <div class="section-label" style="margin-top:12px">Efficiency Metrics</div>
     <div id="efficiency-table-wrap"></div>
+    <div class="caption">
+      <strong>WUI Saved/Acre</strong> = (baseline WUI damage − strategy WUI damage) / acres treated. Higher = more efficient use of Burnbot time.
+      <strong>Wildland Cost/WUI</strong> = increase in wildland burn per unit of WUI damage prevented. Strategies that cluster near WUI may sacrifice wildland protection.
+      <em>Novel metric: no published work evaluates treatment efficiency under robotic operational constraints (travel time, slope feasibility).</em>
+    </div>
+
     <div class="section-label" style="margin-top:12px">Robustness by Ignition Stratum</div>
     <div id="stratum-table-wrap"></div>
-  </div>
-
-  <div class="section" id="sec-map-strat" style="display:none">
-    <div class="section-label">View Treatment Map</div>
-    <div class="strat-select" id="strat-chips"></div>
+    <div class="caption">
+      Ignition points are stratified by <strong>NASA FIRMS hotspot density</strong> into quartiles (Q1=low-risk, Q4=high-risk).
+      Q4 receives 40% of samples; Q1 receives 10% — testing both historical fire zones and unexpected ignition locations.
+      A robust strategy performs well across all strata, not just where fires historically start.
+      <em>Stratified sampling follows standard Monte Carlo variance reduction techniques (Fishman 1996).</em>
+    </div>
   </div>
 
   <div class="section">
@@ -1247,6 +1294,11 @@ function renderResults() {
     chip.onclick = () => showTreatmentMap(n);
     chips.appendChild(chip);
   }
+
+  // Auto-show best strategy on map
+  if (bestName && treatmentMaps[bestName]) {
+    showTreatmentMap(bestName);
+  }
 }
 
 function renderDamageChart(results, names) {
@@ -1335,7 +1387,11 @@ function showTreatmentMap(stratName) {
     ch.classList.toggle('on', ch.textContent === stratName);
   });
   renderDeck();
-  log(`Showing treatment map: ${stratName} (${treatedSet ? treatedSet.size : 0} cells treated)`);
+  const nCells = treatedSet ? treatedSet.size : 0;
+  const acres = nCells * CELL_AREA_ACRES;
+  const info = document.getElementById('map-strat-info');
+  if (info) info.textContent = `${stratName}: ${nCells} cells treated (${acres.toFixed(0)} acres). White lines = firebreak edges.`;
+  log(`Showing treatment map: ${stratName} (${nCells} cells, ${acres.toFixed(0)} acres)`);
 }
 
 // ═══════════════════════════════════════════════════════

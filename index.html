@@ -3,996 +3,380 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PYROSHIELD — Drone Swarm Wildfire Command</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
+<title>PYROSHIELD — Burnbot Treatment Optimizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
 <style>
 :root {
-  --bg-primary: #0a0c10;
-  --bg-secondary: #11141c;
-  --bg-tertiary: #181c28;
-  --bg-card: #141822;
-  --border: #1e2436;
-  --border-active: #2a3350;
-  --text-primary: #e8ecf4;
-  --text-secondary: #7a8299;
-  --text-muted: #4a5068;
-  --fire-hot: #ff4d1a;
-  --fire-warm: #ff8c42;
-  --fire-glow: #ffb347;
-  --fire-ember: #cc3300;
-  --drone-cyan: #00e5ff;
-  --drone-blue: #2979ff;
-  --drone-trail: #00b8d4;
-  --suppressed: #3a3f4a;
-  --success: #00e676;
-  --warning: #ffab00;
-  --accent-purple: #7c4dff;
-  --sidebar-w: 380px;
+  --bg: #0a0c10; --bg2: #11141c; --bg3: #181c28; --border: #1e2436;
+  --text: #e8ecf4; --text2: #7a8299; --muted: #4a5068;
+  --fire: #ff4d1a; --orange: #ff8c42; --cyan: #00e5ff;
+  --green: #00e676; --yellow: #ffab00; --red: #f44336; --purple: #7c4dff;
 }
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: 'Outfit', sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  overflow: hidden;
-  height: 100vh;
-  width: 100vw;
-}
-
-/* ─── LAYOUT ─── */
-.app { display: flex; height: 100vh; width: 100vw; }
-
-.sidebar {
-  width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
-  height: 100vh;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  z-index: 10;
-}
-
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-track { background: transparent; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-.map-container {
-  flex: 1;
-  position: relative;
-  height: 100vh;
-}
-
-#map { width: 100%; height: 100%; }
-#deck-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
-
-/* ─── HEADER ─── */
-.header {
-  padding: 20px 24px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.logo-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.logo-icon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, var(--fire-hot), var(--fire-warm));
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  box-shadow: 0 0 20px rgba(255, 77, 26, 0.3);
-}
-
-.logo-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 4px;
-  background: linear-gradient(135deg, var(--fire-warm), var(--drone-cyan));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.logo-sub {
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1px;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-/* ─── SECTION ─── */
-.section {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.section-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 2px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
-/* ─── STRATEGY BUTTONS ─── */
-.strategy-btns { display: flex; flex-direction: column; gap: 8px; }
-
-.strategy-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-align: left;
-}
-
-.strategy-btn:hover {
-  border-color: var(--border-active);
-  background: var(--bg-card);
-}
-
-.strategy-btn.active {
-  border-color: var(--drone-cyan);
-  background: rgba(0, 229, 255, 0.06);
-  color: var(--text-primary);
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.08), inset 0 0 20px rgba(0, 229, 255, 0.03);
-}
-
-.strategy-btn .strat-name {
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 2px;
-}
-
-.strategy-btn .strat-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.strategy-btn.active .strat-desc { color: var(--text-secondary); }
-
-.strat-indicator {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  margin-right: 8px;
-  transition: all 0.3s;
-}
-
-.strategy-btn.active .strat-indicator {
-  background: var(--drone-cyan);
-  box-shadow: 0 0 8px var(--drone-cyan);
-}
-
-/* ─── CONTROLS ─── */
-.controls { display: flex; gap: 8px; }
-
-.ctrl-btn {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.25s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.ctrl-btn:hover { border-color: var(--border-active); color: var(--text-primary); }
-
-.ctrl-btn.play-btn.active {
-  background: rgba(0, 230, 118, 0.1);
-  border-color: var(--success);
-  color: var(--success);
-}
-
-.ctrl-btn.pause-btn.active {
-  background: rgba(255, 171, 0, 0.1);
-  border-color: var(--warning);
-  color: var(--warning);
-}
-
-/* ─── METRICS ─── */
-.metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.metric-card {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px;
-}
-
-.metric-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  margin-bottom: 6px;
-}
-
-.metric-value {
-  font-size: 24px;
-  font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1;
-}
-
-.metric-value.fire { color: var(--fire-warm); }
-.metric-value.cyan { color: var(--drone-cyan); }
-.metric-value.green { color: var(--success); }
-.metric-value.purple { color: var(--accent-purple); }
-
-.metric-delta {
-  font-size: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  margin-top: 4px;
-  color: var(--text-muted);
-}
-
-/* ─── CHART ─── */
-.chart-container {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
-  height: 160px;
-  position: relative;
-  overflow: hidden;
-}
-
-.chart-container svg { width: 100%; height: 100%; }
-
-/* ─── LAYERS ─── */
-.layer-toggles { display: flex; flex-direction: column; gap: 6px; }
-
-.layer-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.layer-toggle:hover { background: var(--bg-tertiary); }
-
-.toggle-track {
-  width: 36px;
-  height: 20px;
-  border-radius: 10px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  position: relative;
-  transition: all 0.3s;
-  flex-shrink: 0;
-}
-
-.toggle-track.on {
-  background: rgba(0, 229, 255, 0.2);
-  border-color: var(--drone-cyan);
-}
-
-.toggle-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: all 0.3s;
-}
-
-.toggle-track.on .toggle-thumb {
-  left: 18px;
-  background: var(--drone-cyan);
-  box-shadow: 0 0 6px var(--drone-cyan);
-}
-
-.toggle-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-/* ─── DATA SOURCES ─── */
-.data-sources { display: flex; flex-direction: column; gap: 6px; }
-
-.data-src {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--bg-tertiary);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-}
-
-.src-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.src-dot.live {
-  animation: pulse-dot 2s infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.src-info { flex: 1; }
-.src-name { font-size: 12px; font-weight: 600; }
-.src-detail { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-
-/* ─── MAP OVERLAY INFO ─── */
-.map-overlay {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.sim-badge {
-  background: rgba(10, 12, 16, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  pointer-events: auto;
-}
-
-.sim-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 8px var(--success);
-  animation: pulse-dot 1.5s infinite;
-}
-
-.sim-dot.paused { background: var(--warning); box-shadow: 0 0 8px var(--warning); }
-
-.sim-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: var(--text-secondary);
-  letter-spacing: 1px;
-}
-
-.sim-time {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-/* ─── LEGEND ─── */
-.map-legend {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  z-index: 5;
-  background: rgba(10, 12, 16, 0.85);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
-  display: flex;
-  gap: 16px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-/* ─── WIND CANVAS ─── */
-#wind-canvas {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 2;
-  opacity: 0.35;
-}
-
-/* ─── SCANLINE ─── */
-.scanline-overlay {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 3;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-}
-
-/* ─── GLOW EFFECTS ─── */
-.glow-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--drone-cyan), transparent);
-  opacity: 0;
-  animation: scan-sweep 8s infinite;
-  z-index: 4;
-  pointer-events: none;
-}
-
-@keyframes scan-sweep {
-  0% { top: 0; opacity: 0; }
-  5% { opacity: 0.15; }
-  95% { opacity: 0.15; }
-  100% { top: 100%; opacity: 0; }
-}
-
-/* ─── SPEED SELECTOR ─── */
-.speed-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-}
-.speed-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-.speed-btn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-primary);
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.speed-btn.active {
-  border-color: var(--drone-cyan);
-  color: var(--drone-cyan);
-  background: rgba(0,229,255,0.08);
-}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); overflow:hidden; height:100vh; }
+.app { display:flex; height:100vh; }
+
+/* Sidebar */
+.sidebar { width:360px; min-width:360px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; z-index:10; }
+.sidebar::-webkit-scrollbar { width:4px; }
+.sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.header { padding:20px 24px 16px; border-bottom:1px solid var(--border); }
+.logo { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; letter-spacing:4px; background:linear-gradient(135deg,var(--orange),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.logo-sub { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:2px; }
+.section { padding:16px 24px; border-bottom:1px solid var(--border); }
+.section-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
+
+/* Grid info */
+.info-row { display:flex; justify-content:space-between; font-size:12px; color:var(--text2); padding:4px 0; font-family:'JetBrains Mono',monospace; }
+.info-val { color:var(--text); font-weight:600; }
+
+/* Buttons */
+.btn { padding:10px 16px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.2s; width:100%; text-align:center; }
+.btn:hover { border-color:var(--cyan); color:var(--text); }
+.btn-fire { border-color:var(--fire); color:var(--fire); }
+.btn-fire:hover { background:rgba(255,77,26,0.1); }
+.btn-active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,229,255,0.08); }
+
+/* Legend */
+.legend { display:flex; flex-wrap:wrap; gap:10px; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
+.legend-dot { width:10px; height:10px; border-radius:50%; }
+
+/* Fire log */
+#fire-log { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text2); max-height:120px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; line-height:1.6; }
+
+/* Map */
+.map-wrap { flex:1; position:relative; }
+#map { width:100%; height:100%; }
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="header">
-      <div class="logo-row">
-        <div class="logo-icon">🔥</div>
-        <div class="logo-text">PYROSHIELD</div>
-      </div>
-      <div class="logo-sub">Drone Swarm Wildfire Command v2.1</div>
+      <div class="logo">PYROSHIELD</div>
+      <div class="logo-sub">Burnbot Fleet Treatment Optimizer</div>
     </div>
 
-    <!-- Strategy -->
     <div class="section">
-      <div class="section-label">Coordination Strategy</div>
-      <div class="strategy-btns">
-        <div class="strategy-btn active" data-strategy="greedy" onclick="selectStrategy('greedy')">
-          <div class="strat-name"><span class="strat-indicator"></span>Greedy Nearest</div>
-          <div class="strat-desc">Drones assigned to closest active fire</div>
-        </div>
-        <div class="strategy-btn" data-strategy="auction" onclick="selectStrategy('auction')">
-          <div class="strat-name"><span class="strat-indicator"></span>Auction-Based</div>
-          <div class="strat-desc">Cost-bid allocation w/ priority weighting</div>
-        </div>
-        <div class="strategy-btn" data-strategy="coverage" onclick="selectStrategy('coverage')">
-          <div class="strat-name"><span class="strat-indicator"></span>Coverage Path</div>
-          <div class="strat-desc">Systematic sweep with zone partitioning</div>
-        </div>
-      </div>
+      <div class="section-label">Landscape</div>
+      <div class="info-row"><span>Grid</span><span class="info-val" id="info-grid">—</span></div>
+      <div class="info-row"><span>Cell size</span><span class="info-val">~3 km</span></div>
+      <div class="info-row"><span>Operable (≤20°)</span><span class="info-val" id="info-op">—</span></div>
+      <div class="info-row"><span>Marginal (20-30°)</span><span class="info-val" id="info-marg">—</span></div>
+      <div class="info-row"><span>Inoperable (>30°)</span><span class="info-val" id="info-inop">—</span></div>
+      <div class="info-row"><span>Fire risk cells</span><span class="info-val" id="info-risk">—</span></div>
     </div>
 
-    <!-- Controls -->
     <div class="section">
-      <div class="section-label">Simulation</div>
-      <div class="controls">
-        <button class="ctrl-btn play-btn active" onclick="togglePlay()">
-          <span id="play-icon">▶</span> <span id="play-text">RUNNING</span>
-        </button>
-        <button class="ctrl-btn" onclick="resetSim()">↻ RESET</button>
+      <div class="section-label">Fire Spread Test</div>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:10px;">Click a cell on the map to ignite, or:</p>
+      <button class="btn btn-fire" onclick="igniteRandom()">Ignite Random Cell</button>
+      <div style="margin-top:8px;">
+        <button class="btn" onclick="resetFire()">Reset Fire</button>
       </div>
-      <div class="speed-row">
-        <span class="speed-label">SPEED</span>
-        <button class="speed-btn" data-speed="0.5" onclick="setSpeed(0.5, this)">0.5×</button>
-        <button class="speed-btn active" data-speed="1" onclick="setSpeed(1, this)">1×</button>
-        <button class="speed-btn" data-speed="2" onclick="setSpeed(2, this)">2×</button>
-        <button class="speed-btn" data-speed="4" onclick="setSpeed(4, this)">4×</button>
+      <div style="margin-top:10px;" id="fire-log"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Legend</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2e7d32"></div> Operable</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f9a825"></div> Marginal</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c62828"></div> Inoperable</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--fire);box-shadow:0 0 6px var(--fire)"></div> Burning</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Burned</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> FIRMS hotspot</div>
       </div>
     </div>
 
-    <!-- Metrics -->
     <div class="section">
-      <div class="section-label">Live Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-label">Fires Suppressed</div>
-          <div class="metric-value fire" id="m-fires">0</div>
-          <div class="metric-delta" id="m-fires-d">of 48 detected</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Area Covered</div>
-          <div class="metric-value cyan" id="m-area">0%</div>
-          <div class="metric-delta">of target zone</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Avg Response</div>
-          <div class="metric-value green" id="m-resp">—</div>
-          <div class="metric-delta">minutes to suppress</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Fleet Util.</div>
-          <div class="metric-value purple" id="m-util">0%</div>
-          <div class="metric-delta">10 drones active</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chart -->
-    <div class="section">
-      <div class="section-label">Strategy Comparison</div>
-      <div class="chart-container" id="chart"></div>
-    </div>
-
-    <!-- Layers -->
-    <div class="section">
-      <div class="section-label">Map Layers</div>
-      <div class="layer-toggles">
-        <div class="layer-toggle" onclick="toggleLayer('wind')">
-          <div class="toggle-track on" id="tog-wind"><div class="toggle-thumb"></div></div>
-          <span class="toggle-label">Wind Field (NOAA GFS)</span>
-        </div>
-        <div class="layer-toggle" onclick="toggleLayer('terrain')">
-          <div class="toggle-track on" id="tog-terrain"><div class="toggle-thumb"></div></div>
-          <span class="toggle-label">Terrain Elevation (USGS)</span>
-        </div>
-        <div class="layer-toggle" onclick="toggleLayer('paths')">
-          <div class="toggle-track on" id="tog-paths"><div class="toggle-thumb"></div></div>
-          <span class="toggle-label">Drone Flight Paths</span>
-        </div>
-        <div class="layer-toggle" onclick="toggleLayer('fires')">
-          <div class="toggle-track on" id="tog-fires"><div class="toggle-thumb"></div></div>
-          <span class="toggle-label">Fire Hotspots (FIRMS)</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Data Sources -->
-    <div class="section">
-      <div class="section-label">Integrated Data Sources</div>
-      <div class="data-sources">
-        <div class="data-src">
-          <div class="src-dot live" style="background: var(--fire-hot)"></div>
-          <div class="src-info">
-            <div class="src-name">NASA FIRMS</div>
-            <div class="src-detail">VIIRS Active Fire · 375m · NRT</div>
-          </div>
-        </div>
-        <div class="data-src">
-          <div class="src-dot live" style="background: var(--drone-cyan)"></div>
-          <div class="src-info">
-            <div class="src-name">NOAA GFS Wind</div>
-            <div class="src-detail">10m wind vectors · 0.25° grid</div>
-          </div>
-        </div>
-        <div class="data-src">
-          <div class="src-dot live" style="background: var(--success)"></div>
-          <div class="src-info">
-            <div class="src-name">USGS 3DEP Elevation</div>
-            <div class="src-detail">1/3 arc-second DEM · 10m res</div>
-          </div>
-        </div>
-        <div class="data-src">
-          <div class="src-dot live" style="background: var(--accent-purple)"></div>
-          <div class="src-info">
-            <div class="src-name">CAL FIRE Perimeters</div>
-            <div class="src-detail">Historical fire boundaries · GIS</div>
-          </div>
-        </div>
+      <div class="section-label">Data Sources</div>
+      <div style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:1.8;">
+        Fire ignition: NASA FIRMS VIIRS (embedded snapshot)<br>
+        Elevation: Open-Meteo Copernicus DEM (embedded)<br>
+        Wind: Open-Meteo GFS (embedded snapshot)<br>
+        Burnbot specs: RX2 — 1 acre/hr, ≤20mph wind, ≤30° slope
       </div>
     </div>
   </div>
 
-  <!-- MAP -->
-  <div class="map-container">
+  <div class="map-wrap">
     <div id="map"></div>
-    <canvas id="wind-canvas"></canvas>
-    <div class="scanline-overlay"></div>
-    <div class="glow-line"></div>
-
-    <div class="map-overlay">
-      <div class="sim-badge">
-        <div class="sim-dot" id="sim-dot"></div>
-        <div>
-          <div class="sim-text">SIMULATION ACTIVE</div>
-          <div class="sim-time" id="sim-clock">T+ 00:00</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="map-legend">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--fire-hot); box-shadow:0 0 6px var(--fire-hot)"></div> Active Fire</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--suppressed)"></div> Suppressed</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--drone-cyan); box-shadow:0 0 6px var(--drone-cyan)"></div> Drone</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--drone-trail)"></div> Flight Path</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--accent-purple)"></div> Base Station</div>
-    </div>
   </div>
 </div>
 
 <script>
 // ═══════════════════════════════════════════════
-//  DATA — Real California wildfire coordinates
+//  EMBEDDED DATA
 // ═══════════════════════════════════════════════
 
-// Base station (simulated command HQ near Chico, CA)
-const BASE = [-121.74, 39.88];
+// FIRMS historical hotspots — real coords from Camp Fire / Dixie Fire / North Complex
+const FIRMS = [
+  [39.764,-121.606,142],[39.778,-121.585,118],[39.751,-121.622,135],[39.790,-121.570,89],
+  [39.740,-121.640,110],[39.802,-121.555,76],[39.770,-121.615,128],[39.755,-121.590,95],
+  [40.140,-121.180,165],[40.120,-121.150,140],[40.160,-121.200,115],[40.100,-121.130,100],
+  [40.180,-121.220,125],[40.080,-121.100,88],[40.150,-121.170,148],[40.200,-121.250,80],
+  [39.820,-121.400,105],[39.840,-121.380,92],[39.800,-121.420,112],[39.860,-121.360,85],
+  [39.780,-121.440,130],[39.880,-121.350,70],[39.830,-121.390,108],[39.810,-121.410,97],
+  [39.750,-121.500,65],[39.730,-121.520,58],[39.770,-121.480,82],[39.710,-121.540,68],
+  [39.900,-121.300,62],[39.920,-121.320,55],[39.880,-121.280,72],[39.940,-121.340,50],
+  [39.720,-121.650,90],[39.700,-121.680,82],[39.740,-121.620,100],[39.760,-121.580,86],
+  [40.050,-121.080,106],[40.030,-121.050,90],[40.070,-121.100,120],[40.010,-121.020,80],
+  [40.090,-121.120,112],[39.990,-121.000,75],[40.040,-121.070,132],[40.020,-121.030,88],
+  [39.850,-121.700,60],[39.830,-121.720,52],[39.870,-121.680,66],[39.890,-121.660,48]
+]; // [lat, lng, frp]
 
-// Fire hotspots — realistic coords around Camp Fire / Dixie Fire / North Complex regions
-const FIRE_DATA = [
-  // Camp Fire area (Paradise, CA)
-  {lng:-121.606, lat:39.764, intensity:0.95, frp:142},
-  {lng:-121.585, lat:39.778, intensity:0.88, frp:118},
-  {lng:-121.622, lat:39.751, intensity:0.92, frp:135},
-  {lng:-121.570, lat:39.790, intensity:0.72, frp:89},
-  {lng:-121.640, lat:39.740, intensity:0.85, frp:110},
-  {lng:-121.555, lat:39.802, intensity:0.68, frp:76},
-  {lng:-121.615, lat:39.770, intensity:0.90, frp:128},
-  {lng:-121.590, lat:39.755, intensity:0.78, frp:95},
-  // Dixie Fire area (Greenville / Indian Falls)
-  {lng:-121.18, lat:40.14, intensity:0.97, frp:165},
-  {lng:-121.15, lat:40.12, intensity:0.91, frp:140},
-  {lng:-121.20, lat:40.16, intensity:0.85, frp:115},
-  {lng:-121.13, lat:40.10, intensity:0.80, frp:100},
-  {lng:-121.22, lat:40.18, intensity:0.88, frp:125},
-  {lng:-121.10, lat:40.08, intensity:0.75, frp:88},
-  {lng:-121.17, lat:40.15, intensity:0.93, frp:148},
-  {lng:-121.25, lat:40.20, intensity:0.70, frp:80},
-  // North Complex area
-  {lng:-121.40, lat:39.82, intensity:0.82, frp:105},
-  {lng:-121.38, lat:39.84, intensity:0.77, frp:92},
-  {lng:-121.42, lat:39.80, intensity:0.86, frp:112},
-  {lng:-121.36, lat:39.86, intensity:0.73, frp:85},
-  {lng:-121.44, lat:39.78, intensity:0.90, frp:130},
-  {lng:-121.35, lat:39.88, intensity:0.65, frp:70},
-  {lng:-121.39, lat:39.83, intensity:0.84, frp:108},
-  {lng:-121.41, lat:39.81, intensity:0.79, frp:97},
-  // Scattered spots (Feather River Canyon, Concow)
-  {lng:-121.50, lat:39.75, intensity:0.60, frp:65},
-  {lng:-121.52, lat:39.73, intensity:0.55, frp:58},
-  {lng:-121.48, lat:39.77, intensity:0.70, frp:82},
-  {lng:-121.54, lat:39.71, intensity:0.62, frp:68},
-  {lng:-121.30, lat:39.90, intensity:0.58, frp:62},
-  {lng:-121.32, lat:39.92, intensity:0.52, frp:55},
-  {lng:-121.28, lat:39.88, intensity:0.65, frp:72},
-  {lng:-121.34, lat:39.94, intensity:0.48, frp:50},
-  // Additional spread (Butte County foothills)
-  {lng:-121.65, lat:39.72, intensity:0.75, frp:90},
-  {lng:-121.68, lat:39.70, intensity:0.70, frp:82},
-  {lng:-121.62, lat:39.74, intensity:0.80, frp:100},
-  {lng:-121.58, lat:39.76, intensity:0.72, frp:86},
-  {lng:-121.55, lat:39.82, intensity:0.66, frp:74},
-  {lng:-121.60, lat:39.80, intensity:0.78, frp:95},
-  // Eastern ridge fires
-  {lng:-121.08, lat:40.05, intensity:0.82, frp:106},
-  {lng:-121.05, lat:40.03, intensity:0.76, frp:90},
-  {lng:-121.10, lat:40.07, intensity:0.88, frp:120},
-  {lng:-121.02, lat:40.01, intensity:0.70, frp:80},
-  {lng:-121.12, lat:40.09, intensity:0.84, frp:112},
-  {lng:-121.00, lat:39.99, intensity:0.68, frp:75},
-  {lng:-121.07, lat:40.04, intensity:0.90, frp:132},
-  {lng:-121.03, lat:40.02, intensity:0.74, frp:88},
-  // Valley edge
-  {lng:-121.70, lat:39.85, intensity:0.55, frp:60},
-  {lng:-121.72, lat:39.83, intensity:0.50, frp:52},
-  {lng:-121.68, lat:39.87, intensity:0.60, frp:66},
-  {lng:-121.66, lat:39.89, intensity:0.45, frp:48},
-];
+// Wind — single representative profile (NW wind, moderate)
+const WIND = { speed_ms: 6.5, dir_deg: 315 }; // NW at ~15mph
+
+// Elevation grid — we'll build this with realistic values
+// Sierra foothills: valley ~60m west, rising to ~2000m east
+const GRID = { lngMin:-121.85, lngMax:-120.95, latMin:39.60, latMax:40.30, step:0.03 };
 
 // ═══════════════════════════════════════════════
-//  TERRAIN ELEVATION GRID (simulated USGS data)
+//  BUILD LANDSCAPE GRID
 // ═══════════════════════════════════════════════
-function generateTerrainGrid() {
-  const pts = [];
-  for (let lng = -121.85; lng <= -120.90; lng += 0.025) {
-    for (let lat = 39.60; lat <= 40.30; lat += 0.025) {
-      // Simulate Sierra foothills: elevation increases east
-      const baseElev = 200 + (lng + 122) * -1800;
-      const noise = Math.sin(lng * 50) * 80 + Math.cos(lat * 60) * 60 + Math.sin((lng+lat)*30)*40;
-      const elev = Math.max(100, baseElev + noise);
-      pts.push({lng, lat, elevation: elev});
+const cells = [];
+const cellsByRC = {};; // row,col -> cell index
+let nCols = 0, nRows = 0;
+
+function buildGrid() {
+  let row = 0;
+  for (let lat = GRID.latMin; lat <= GRID.latMax; lat += GRID.step) {
+    let col = 0;
+    for (let lng = GRID.lngMin; lng <= GRID.lngMax; lng += GRID.step) {
+      // Elevation model: rises from west (~60m) to east (~2000m) with ridge noise
+      const eastFrac = (lng - GRID.lngMin) / (GRID.lngMax - GRID.lngMin);
+      const baseElev = 60 + eastFrac * 1800;
+      const ridge = Math.sin(lat * 80) * 120 + Math.cos(lng * 60) * 80;
+      const canyon = Math.sin((lat + lng) * 40) * 100;
+      const elev = Math.max(30, baseElev + ridge + canyon);
+
+      // Fuel load: higher at mid-elevations (chaparral/mixed conifer), lower at valley floor and high peaks
+      const elevNorm = Math.min(1, elev / 2000);
+      const fuelBase = Math.sin(elevNorm * Math.PI) * 0.8; // peaks at mid-elevation
+      const fuelNoise = (Math.sin(lat * 100 + lng * 77) * 0.5 + 0.5) * 0.3;
+      const fuel = Math.max(0.05, Math.min(1, fuelBase + fuelNoise));
+
+      // Ignition probability from FIRMS density
+      let ignitionBoost = 0;
+      FIRMS.forEach(([flat, flng, frp]) => {
+        const d = Math.hypot(lat - flat, lng - flng);
+        if (d < 0.08) ignitionBoost += (frp / 165) * (1 - d / 0.08);
+      });
+      const ignitionProb = Math.min(1, 0.02 + ignitionBoost * 0.15);
+
+      const idx = cells.length;
+      cellsByRC[`${row},${col}`] = idx;
+      cells.push({
+        row, col, lat: parseFloat(lat.toFixed(4)), lng: parseFloat(lng.toFixed(4)),
+        elevation: elev, fuel, ignitionProb,
+        slope: 0, operable: 'yes', // computed after grid is built
+        burning: false, burned: false, treated: false, burnTimer: 0
+      });
+      col++;
     }
+    if (row === 0) nCols = col;
+    row++;
   }
-  return pts;
-}
-const TERRAIN = generateTerrainGrid();
+  nRows = row;
 
-// ═══════════════════════════════════════════════
-//  STATE
-// ═══════════════════════════════════════════════
-let state = {
-  strategy: 'greedy',
-  running: true,
-  speed: 1,
-  simTime: 0,
-  fires: FIRE_DATA.map((f,i) => ({...f, id: i, suppressed: false, suppressTime: null, flickerPhase: Math.random() * Math.PI * 2})),
-  drones: [],
-  layers: { wind: true, terrain: true, paths: true, fires: true },
-  metrics: { suppressed: 0, areaPct: 0, avgResp: 0, util: 0 },
-  history: [] // for chart
-};
-
-// Initialize 10 drones at base
-for (let i = 0; i < 10; i++) {
-  state.drones.push({
-    id: i,
-    lng: BASE[0] + (Math.random()-0.5)*0.01,
-    lat: BASE[1] + (Math.random()-0.5)*0.01,
-    targetFire: null,
-    path: [],
-    pathHistory: [],
-    status: 'idle', // idle | enroute | suppressing | returning
-    suppressProgress: 0,
-    speed: 0.0008 + Math.random() * 0.0003
+  // Compute slope between adjacent cells
+  const cellSizeM = GRID.step * 111320;
+  cells.forEach((cell, i) => {
+    let maxSlope = 0;
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc]) => {
+      const ni = cellsByRC[`${cell.row+dr},${cell.col+dc}`];
+      if (ni !== undefined) {
+        const dElev = Math.abs(cells[ni].elevation - cell.elevation);
+        maxSlope = Math.max(maxSlope, Math.atan(dElev / cellSizeM) * 180 / Math.PI);
+      }
+    });
+    cell.slope = maxSlope;
+    cell.operable = maxSlope <= 20 ? 'yes' : maxSlope <= 30 ? 'marginal' : 'no';
   });
+
+  // Update sidebar
+  const op = cells.filter(c => c.operable === 'yes').length;
+  const marg = cells.filter(c => c.operable === 'marginal').length;
+  const inop = cells.filter(c => c.operable === 'no').length;
+  const risk = cells.filter(c => c.ignitionProb > 0.05).length;
+  document.getElementById('info-grid').textContent = `${nRows}×${nCols} (${cells.length} cells)`;
+  document.getElementById('info-op').textContent = `${op} (${(op/cells.length*100).toFixed(0)}%)`;
+  document.getElementById('info-marg').textContent = `${marg} (${(marg/cells.length*100).toFixed(0)}%)`;
+  document.getElementById('info-inop').textContent = `${inop} (${(inop/cells.length*100).toFixed(0)}%)`;
+  document.getElementById('info-risk').textContent = `${risk}`;
 }
 
 // ═══════════════════════════════════════════════
-//  MAP SETUP
+//  FIRE SPREAD — Cellular Automaton
+// ═══════════════════════════════════════════════
+let fireInterval = null;
+const SPREAD_BASE = 0.35; // base probability of spreading to neighbor per tick
+
+function igniteCell(idx) {
+  if (idx < 0 || idx >= cells.length) return;
+  const c = cells[idx];
+  if (c.burning || c.burned || c.treated) return;
+  c.burning = true;
+  c.burnTimer = 0;
+  log(`Ignited cell [${c.row},${c.col}] — elev ${c.elevation.toFixed(0)}m, fuel ${(c.fuel*100).toFixed(0)}%, slope ${c.slope.toFixed(1)}°`);
+  if (!fireInterval) startFireLoop();
+}
+
+function igniteRandom() {
+  // Pick from high-ignition-probability cells
+  const candidates = cells.filter(c => !c.burning && !c.burned && !c.treated && c.ignitionProb > 0.05);
+  if (candidates.length === 0) return;
+  // Weighted random by ignition probability
+  const totalProb = candidates.reduce((s, c) => s + c.ignitionProb, 0);
+  let r = Math.random() * totalProb;
+  for (const c of candidates) {
+    r -= c.ignitionProb;
+    if (r <= 0) { igniteCell(cells.indexOf(c)); return; }
+  }
+  igniteCell(cells.indexOf(candidates[candidates.length - 1]));
+}
+
+function spreadFire() {
+  const toIgnite = [];
+  const toBurnOut = [];
+
+  cells.forEach((cell, i) => {
+    if (!cell.burning) return;
+    cell.burnTimer++;
+
+    // Burn out after fuel is consumed (higher fuel = longer burn)
+    if (cell.burnTimer > 3 + cell.fuel * 8) {
+      toBurnOut.push(i);
+      return;
+    }
+
+    // Try to spread to 4 neighbors
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc]) => {
+      const ni = cellsByRC[`${cell.row+dr},${cell.col+dc}`];
+      if (ni === undefined) return;
+      const nb = cells[ni];
+      if (nb.burning || nb.burned || nb.treated) return;
+
+      // Spread probability depends on:
+      // 1. Neighbor's fuel load (more fuel = easier to ignite)
+      // 2. Slope (fire spreads faster uphill)
+      // 3. Wind (spreads faster downwind)
+      let prob = SPREAD_BASE * nb.fuel;
+
+      // Slope effect: uphill increases spread
+      const elevDiff = nb.elevation - cell.elevation;
+      if (elevDiff > 0) prob *= 1 + (elevDiff / 200); // uphill boost
+      else prob *= Math.max(0.3, 1 + elevDiff / 500); // downhill penalty
+
+      // Wind effect: NW wind pushes fire SE
+      const windRad = (WIND.dir_deg - 180) * Math.PI / 180; // direction fire travels
+      const spreadDir = Math.atan2(dc, dr); // direction of this neighbor
+      const windAlign = Math.cos(spreadDir - windRad);
+      const windFactor = 1 + windAlign * (WIND.speed_ms / 10);
+      prob *= Math.max(0.2, windFactor);
+
+      prob = Math.min(0.95, prob);
+      if (Math.random() < prob) toIgnite.push(ni);
+    });
+  });
+
+  toBurnOut.forEach(i => { cells[i].burning = false; cells[i].burned = true; });
+  toIgnite.forEach(i => {
+    if (!cells[i].burning && !cells[i].burned) {
+      cells[i].burning = true;
+      cells[i].burnTimer = 0;
+    }
+  });
+
+  renderDeck();
+
+  // Check if fire is still active
+  if (!cells.some(c => c.burning)) {
+    clearInterval(fireInterval);
+    fireInterval = null;
+    const burnedCount = cells.filter(c => c.burned).length;
+    log(`Fire out. ${burnedCount} cells burned (${(burnedCount/cells.length*100).toFixed(1)}% of landscape).`);
+  }
+}
+
+function startFireLoop() {
+  if (fireInterval) return;
+  fireInterval = setInterval(spreadFire, 200);
+}
+
+function resetFire() {
+  if (fireInterval) { clearInterval(fireInterval); fireInterval = null; }
+  cells.forEach(c => { c.burning = false; c.burned = false; c.burnTimer = 0; });
+  document.getElementById('fire-log').textContent = '';
+  renderDeck();
+}
+
+function log(msg) {
+  const el = document.getElementById('fire-log');
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════
+//  MAP + DECK.GL
 // ═══════════════════════════════════════════════
 const map = new maplibregl.Map({
   container: 'map',
   style: {
     version: 8,
-    sources: {
-      'carto-dark': {
-        type: 'raster',
-        tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
-        tileSize: 256,
-        attribution: '© CARTO © OpenStreetMap'
-      }
-    },
-    layers: [{
-      id: 'carto-dark-layer',
-      type: 'raster',
-      source: 'carto-dark',
-      minzoom: 0,
-      maxzoom: 19
-    }]
+    sources: { 'carto': { type:'raster', tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'], tileSize:256 }},
+    layers: [{ id:'carto', type:'raster', source:'carto' }]
   },
-  center: [-121.35, 39.95],
-  zoom: 9.2,
-  pitch: 15,
-  bearing: -5,
-  maxZoom: 14,
-  minZoom: 7
+  center: [-121.35, 39.95], zoom: 9, pitch: 0, maxZoom: 13, minZoom: 7
 });
 
-map.on('load', () => {
-  startSimulation();
-  initChart();
-  initWind();
-});
-
-// ═══════════════════════════════════════════════
-//  DECK.GL OVERLAY
-// ═══════════════════════════════════════════════
 let deckOverlay = null;
 
+function cellColor(c) {
+  if (c.burning) return [255, 60, 10, 200];
+  if (c.burned) return [40, 40, 40, 160];
+  if (c.treated) return [0, 150, 255, 120];
+  // Operability coloring with fuel intensity
+  const f = c.fuel;
+  if (c.operable === 'yes') return [30 + f*20, 100 + f*25, 40, 50 + f*60];
+  if (c.operable === 'marginal') return [200, 160, 30, 50 + f*60];
+  return [180, 30, 30, 50 + f*60];
+}
+
 function renderDeck() {
-  const layers = [];
-  const t = performance.now();
-
-  // Terrain heatmap
-  if (state.layers.terrain) {
-    layers.push(new deck.ScatterplotLayer({
-      id: 'terrain',
-      data: TERRAIN,
+  const layers = [
+    new deck.ScatterplotLayer({
+      id: 'grid',
+      data: cells,
       getPosition: d => [d.lng, d.lat],
-      getRadius: 800,
-      getFillColor: d => {
-        const n = Math.min(1, (d.elevation - 100) / 1600);
-        return [20 + n*30, 40 + n*15, 10 + n*50, 35 + n*30];
-      },
+      getRadius: 1200,
+      getFillColor: d => cellColor(d),
       radiusMinPixels: 4,
-      radiusMaxPixels: 20,
-    }));
-  }
-
-  // Fire hotspots
-  if (state.layers.fires) {
-    // Outer glow
-    layers.push(new deck.ScatterplotLayer({
-      id: 'fire-glow',
-      data: state.fires.filter(f => !f.suppressed),
-      getPosition: d => [d.lng, d.lat],
-      getRadius: d => 600 + Math.sin(t/300 + d.flickerPhase) * 200 + d.frp * 2,
-      getFillColor: d => {
-        const flicker = 0.6 + Math.sin(t/200 + d.flickerPhase) * 0.4;
-        return [255, 60, 10, 30 * flicker * d.intensity];
-      },
-      radiusMinPixels: 8,
-      radiusMaxPixels: 40,
-      updateTriggers: { getRadius: [t], getFillColor: [t] }
-    }));
-
-    // Core fire
-    layers.push(new deck.ScatterplotLayer({
-      id: 'fire-core',
-      data: state.fires.filter(f => !f.suppressed),
-      getPosition: d => [d.lng, d.lat],
-      getRadius: d => 200 + Math.sin(t/150 + d.flickerPhase) * 80,
-      getFillColor: d => {
-        const flicker = 0.7 + Math.sin(t/180 + d.flickerPhase) * 0.3;
-        return [255, 140 * d.intensity, 50, 220 * flicker];
-      },
-      radiusMinPixels: 4,
-      radiusMaxPixels: 14,
-      updateTriggers: { getRadius: [t], getFillColor: [t] }
-    }));
-
-    // Suppressed
-    layers.push(new deck.ScatterplotLayer({
-      id: 'fire-suppressed',
-      data: state.fires.filter(f => f.suppressed),
-      getPosition: d => [d.lng, d.lat],
-      getRadius: 200,
-      getFillColor: [58, 63, 74, 150],
-      radiusMinPixels: 3,
-      radiusMaxPixels: 8,
-    }));
-  }
-
-  // Drone paths
-  if (state.layers.paths) {
-    const pathData = state.drones.filter(d => d.pathHistory.length > 1);
-    layers.push(new deck.PathLayer({
-      id: 'drone-paths',
-      data: pathData,
-      getPath: d => d.pathHistory.slice(-60),
-      getColor: [0, 184, 212, 80],
-      getWidth: 2,
-      widthMinPixels: 1,
-      widthMaxPixels: 3,
-      jointRounded: true,
-      capRounded: true,
-    }));
-  }
-
-  // Base station
-  layers.push(new deck.ScatterplotLayer({
-    id: 'base-glow',
-    data: [{lng: BASE[0], lat: BASE[1]}],
-    getPosition: d => [d.lng, d.lat],
-    getRadius: 800 + Math.sin(t/500) * 200,
-    getFillColor: [124, 77, 255, 40],
-    radiusMinPixels: 12,
-    radiusMaxPixels: 30,
-    updateTriggers: { getRadius: [t] }
-  }));
-
-  layers.push(new deck.ScatterplotLayer({
-    id: 'base-core',
-    data: [{lng: BASE[0], lat: BASE[1]}],
-    getPosition: d => [d.lng, d.lat],
-    getRadius: 250,
-    getFillColor: [124, 77, 255, 220],
-    radiusMinPixels: 5,
-    radiusMaxPixels: 10,
-  }));
-
-  // Drones
-  // drone glow
-  layers.push(new deck.ScatterplotLayer({
-    id: 'drone-glow',
-    data: state.drones,
-    getPosition: d => [d.lng, d.lat],
-    getRadius: 500 + Math.sin(t/300) * 150,
-    getFillColor: d => d.status === 'suppressing' ? [0, 230, 118, 50] : [0, 229, 255, 40],
-    radiusMinPixels: 6,
-    radiusMaxPixels: 18,
-    updateTriggers: { getRadius: [t], getPosition: [t], getFillColor: [t] }
-  }));
-
-  // drone core
-  layers.push(new deck.ScatterplotLayer({
-    id: 'drone-core',
-    data: state.drones,
-    getPosition: d => [d.lng, d.lat],
-    getRadius: 180,
-    getFillColor: d => d.status === 'suppressing' ? [0, 230, 118, 255] : [0, 229, 255, 255],
-    radiusMinPixels: 3,
-    radiusMaxPixels: 7,
-    updateTriggers: { getPosition: [t], getFillColor: [t] }
-  }));
-
-  // Suppression rings (for drones actively suppressing)
-  const suppressingDrones = state.drones.filter(d => d.status === 'suppressing');
-  if (suppressingDrones.length > 0) {
-    layers.push(new deck.ScatterplotLayer({
-      id: 'suppress-ring',
-      data: suppressingDrones,
-      getPosition: d => [d.lng, d.lat],
-      getRadius: d => 300 + d.suppressProgress * 400,
-      getFillColor: [0, 230, 118, 0],
-      getLineColor: [0, 230, 118, 120],
-      lineWidthMinPixels: 1,
-      stroked: true,
-      filled: false,
-      radiusMinPixels: 6,
-      radiusMaxPixels: 25,
-      updateTriggers: { getRadius: [t] }
-    }));
-  }
+      radiusMaxPixels: 18,
+      pickable: true,
+      onClick: ({object}) => { if (object) igniteCell(cells.indexOf(object)); },
+      updateTriggers: { getFillColor: [Date.now()] }
+    }),
+    // FIRMS hotspots as cyan dots
+    new deck.ScatterplotLayer({
+      id: 'firms',
+      data: FIRMS,
+      getPosition: d => [d[1], d[0]],
+      getRadius: 400,
+      getFillColor: [0, 229, 255, 100],
+      radiusMinPixels: 2,
+      radiusMaxPixels: 6,
+    })
+  ];
 
   if (!deckOverlay) {
-    deckOverlay = new deck.MapboxOverlay({ layers });
+    deckOverlay = new deck.MapboxOverlay({ layers, interleaved: false });
     map.addControl(deckOverlay);
   } else {
     deckOverlay.setProps({ layers });
@@ -1000,401 +384,12 @@ function renderDeck() {
 }
 
 // ═══════════════════════════════════════════════
-//  STRATEGIES
+//  INIT
 // ═══════════════════════════════════════════════
-function assignGreedy() {
-  const activeFires = state.fires.filter(f => !f.suppressed && !state.drones.some(d => d.targetFire === f.id));
-  state.drones.forEach(drone => {
-    if (drone.status !== 'idle') return;
-    if (activeFires.length === 0) return;
-    let nearest = null, minDist = Infinity;
-    activeFires.forEach(f => {
-      const d = Math.hypot(f.lng - drone.lng, f.lat - drone.lat);
-      if (d < minDist) { minDist = d; nearest = f; }
-    });
-    if (nearest) {
-      drone.targetFire = nearest.id;
-      drone.status = 'enroute';
-      const idx = activeFires.indexOf(nearest);
-      if (idx > -1) activeFires.splice(idx, 1);
-    }
-  });
-}
-
-function assignAuction() {
-  const activeFires = state.fires.filter(f => !f.suppressed && !state.drones.some(d => d.targetFire === f.id));
-  const idleDrones = state.drones.filter(d => d.status === 'idle');
-
-  // Each drone bids on fires: bid = 1/(distance * (2 - intensity))
-  // Highest bidder wins each fire
-  const assignments = [];
-  const usedDrones = new Set();
-  const usedFires = new Set();
-
-  for (let round = 0; round < Math.min(idleDrones.length, activeFires.length); round++) {
-    let bestBid = -1, bestDrone = null, bestFire = null;
-    idleDrones.forEach(drone => {
-      if (usedDrones.has(drone.id)) return;
-      activeFires.forEach(fire => {
-        if (usedFires.has(fire.id)) return;
-        const dist = Math.hypot(fire.lng - drone.lng, fire.lat - drone.lat);
-        const bid = fire.intensity / (dist + 0.01);
-        if (bid > bestBid) {
-          bestBid = bid;
-          bestDrone = drone;
-          bestFire = fire;
-        }
-      });
-    });
-    if (bestDrone && bestFire) {
-      bestDrone.targetFire = bestFire.id;
-      bestDrone.status = 'enroute';
-      usedDrones.add(bestDrone.id);
-      usedFires.add(bestFire.id);
-    }
-  }
-}
-
-function assignCoverage() {
-  const idleDrones = state.drones.filter(d => d.status === 'idle');
-  if (idleDrones.length === 0) return;
-
-  // Divide area into zones, sweep systematically
-  const zones = [];
-  const lngMin = -121.85, lngMax = -120.95, latMin = 39.65, latMax = 40.25;
-  const cols = 5, rows = 2;
-  const dLng = (lngMax - lngMin)/cols, dLat = (latMax - latMin)/rows;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const zoneLng = lngMin + (c+0.5)*dLng;
-      const zoneLat = latMin + (r+0.5)*dLat;
-      const zoneFires = state.fires.filter(f =>
-        !f.suppressed &&
-        !state.drones.some(d => d.targetFire === f.id) &&
-        f.lng >= lngMin + c*dLng && f.lng < lngMin + (c+1)*dLng &&
-        f.lat >= latMin + r*dLat && f.lat < latMin + (r+1)*dLat
-      );
-      if (zoneFires.length > 0) {
-        zones.push({ fires: zoneFires, center: [zoneLng, zoneLat] });
-      }
-    }
-  }
-
-  // Sort zones by fire count (highest first)
-  zones.sort((a,b) => b.fires.length - a.fires.length);
-
-  let di = 0;
-  zones.forEach(zone => {
-    zone.fires.forEach(fire => {
-      if (di >= idleDrones.length) return;
-      idleDrones[di].targetFire = fire.id;
-      idleDrones[di].status = 'enroute';
-      di++;
-    });
-  });
-}
-
-// ═══════════════════════════════════════════════
-//  SIMULATION LOOP
-// ═══════════════════════════════════════════════
-function startSimulation() {
-  function tick() {
-    if (state.running) {
-      updateSim();
-    }
-    renderDeck();
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-}
-
-function updateSim() {
-  state.simTime += 0.016 * state.speed;
-
-  // Assign targets based on strategy
-  if (state.strategy === 'greedy') assignGreedy();
-  else if (state.strategy === 'auction') assignAuction();
-  else assignCoverage();
-
-  // Move drones
-  state.drones.forEach(drone => {
-    if (drone.status === 'enroute') {
-      const fire = state.fires[drone.targetFire];
-      if (!fire) { drone.status = 'idle'; drone.targetFire = null; return; }
-      const dx = fire.lng - drone.lng;
-      const dy = fire.lat - drone.lat;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.003) {
-        drone.status = 'suppressing';
-        drone.suppressProgress = 0;
-      } else {
-        const step = drone.speed * state.speed;
-        drone.lng += (dx/dist) * step;
-        drone.lat += (dy/dist) * step;
-      }
-      drone.pathHistory.push([drone.lng, drone.lat]);
-      if (drone.pathHistory.length > 200) drone.pathHistory.shift();
-    } else if (drone.status === 'suppressing') {
-      drone.suppressProgress += 0.008 * state.speed;
-      if (drone.suppressProgress >= 1) {
-        const fire = state.fires[drone.targetFire];
-        if (fire) {
-          fire.suppressed = true;
-          fire.suppressTime = state.simTime;
-        }
-        drone.status = 'returning';
-        drone.targetFire = null;
-      }
-    } else if (drone.status === 'returning') {
-      const dx = BASE[0] - drone.lng;
-      const dy = BASE[1] - drone.lat;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.005) {
-        drone.status = 'idle';
-        drone.lng = BASE[0] + (Math.random()-0.5)*0.008;
-        drone.lat = BASE[1] + (Math.random()-0.5)*0.008;
-      } else {
-        const step = drone.speed * 1.2 * state.speed;
-        drone.lng += (dx/dist) * step;
-        drone.lat += (dy/dist) * step;
-      }
-      drone.pathHistory.push([drone.lng, drone.lat]);
-      if (drone.pathHistory.length > 200) drone.pathHistory.shift();
-    }
-  });
-
-  // Update metrics
-  const suppressed = state.fires.filter(f => f.suppressed).length;
-  const active = state.drones.filter(d => d.status !== 'idle').length;
-  state.metrics.suppressed = suppressed;
-  state.metrics.areaPct = Math.min(100, Math.round((suppressed / state.fires.length) * 100));
-  state.metrics.util = Math.round((active / state.drones.length) * 100);
-
-  if (suppressed > 0) {
-    const times = state.fires.filter(f => f.suppressed).map(f => f.suppressTime);
-    state.metrics.avgResp = (times.reduce((a,b)=>a+b,0) / times.length * 2.5).toFixed(1);
-  }
-
-  updateMetricsUI();
-  updateClock();
-
-  // Record history every ~1s
-  if (Math.floor(state.simTime * 10) % 10 === 0) {
-    state.history.push({
-      t: state.simTime,
-      suppressed: suppressed,
-      util: state.metrics.util,
-      area: state.metrics.areaPct
-    });
-    if (state.history.length > 60) state.history.shift();
-    updateChart();
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  UI UPDATES
-// ═══════════════════════════════════════════════
-function updateMetricsUI() {
-  document.getElementById('m-fires').textContent = state.metrics.suppressed;
-  document.getElementById('m-fires-d').textContent = `of ${state.fires.length} detected`;
-  document.getElementById('m-area').textContent = state.metrics.areaPct + '%';
-  document.getElementById('m-resp').textContent = state.metrics.avgResp || '—';
-  document.getElementById('m-util').textContent = state.metrics.util + '%';
-}
-
-function updateClock() {
-  const mins = Math.floor(state.simTime / 60);
-  const secs = Math.floor(state.simTime % 60);
-  document.getElementById('sim-clock').textContent =
-    `T+ ${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
-}
-
-// ═══════════════════════════════════════════════
-//  CHART
-// ═══════════════════════════════════════════════
-let chartSvg, chartX, chartY, chartLine;
-
-function initChart() {
-  const container = document.getElementById('chart');
-  const w = container.clientWidth - 8;
-  const h = container.clientHeight - 8;
-  const margin = {top: 10, right: 10, bottom: 20, left: 30};
-
-  chartSvg = d3.select('#chart').append('svg')
-    .attr('width', w).attr('height', h);
-
-  chartX = d3.scaleLinear().range([margin.left, w - margin.right]);
-  chartY = d3.scaleLinear().domain([0, 100]).range([h - margin.bottom, margin.top]);
-
-  // Axes
-  chartSvg.append('g')
-    .attr('class', 'x-axis')
-    .attr('transform', `translate(0,${h - margin.bottom})`)
-    .call(d3.axisBottom(chartX).ticks(5).tickFormat(d => Math.round(d)+'s'))
-    .selectAll('text').style('fill', '#4a5068').style('font-size', '9px').style('font-family', 'JetBrains Mono');
-
-  chartSvg.append('g')
-    .attr('class', 'y-axis')
-    .attr('transform', `translate(${margin.left},0)`)
-    .call(d3.axisLeft(chartY).ticks(4).tickFormat(d => d+'%'))
-    .selectAll('text').style('fill', '#4a5068').style('font-size', '9px').style('font-family', 'JetBrains Mono');
-
-  chartSvg.selectAll('.domain, .tick line').style('stroke', '#1e2436');
-
-  // Lines
-  chartLine = d3.line().x(d => chartX(d.t)).y(d => chartY(d.area)).curve(d3.curveCatmullRom);
-
-  chartSvg.append('path').attr('class', 'area-line')
-    .style('fill', 'none').style('stroke', '#00e5ff').style('stroke-width', 2);
-
-  chartSvg.append('path').attr('class', 'util-line')
-    .style('fill', 'none').style('stroke', '#7c4dff').style('stroke-width', 1.5).style('stroke-dasharray', '4,3');
-
-  // Labels
-  chartSvg.append('text').attr('x', w - margin.right).attr('y', margin.top + 10)
-    .style('fill', '#00e5ff').style('font-size', '9px').style('font-family', 'JetBrains Mono').style('text-anchor', 'end')
-    .text('Coverage %');
-
-  chartSvg.append('text').attr('x', w - margin.right).attr('y', margin.top + 22)
-    .style('fill', '#7c4dff').style('font-size', '9px').style('font-family', 'JetBrains Mono').style('text-anchor', 'end')
-    .text('Fleet Util %');
-}
-
-function updateChart() {
-  if (!chartSvg || state.history.length < 2) return;
-  const utilLine = d3.line().x(d => chartX(d.t)).y(d => chartY(d.util)).curve(d3.curveCatmullRom);
-
-  chartX.domain(d3.extent(state.history, d => d.t));
-  chartSvg.select('.area-line').attr('d', chartLine(state.history));
-  chartSvg.select('.util-line').attr('d', utilLine(state.history));
-}
-
-// ═══════════════════════════════════════════════
-//  WIND PARTICLES
-// ═══════════════════════════════════════════════
-let windParticles = [];
-let windCtx;
-
-function initWind() {
-  const canvas = document.getElementById('wind-canvas');
-  canvas.width = canvas.parentElement.clientWidth;
-  canvas.height = canvas.parentElement.clientHeight;
-  windCtx = canvas.getContext('2d');
-
-  // Create particles
-  for (let i = 0; i < 300; i++) {
-    windParticles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      speed: 0.3 + Math.random() * 0.8,
-      angle: (-25 + Math.random() * 15) * Math.PI / 180, // NW wind
-      life: Math.random(),
-      maxLife: 0.5 + Math.random() * 0.5
-    });
-  }
-
-  function drawWind() {
-    if (!state.layers.wind) {
-      windCtx.clearRect(0, 0, canvas.width, canvas.height);
-      requestAnimationFrame(drawWind);
-      return;
-    }
-
-    windCtx.fillStyle = 'rgba(0,0,0,0.08)';
-    windCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-    windParticles.forEach(p => {
-      p.x += Math.cos(p.angle) * p.speed * state.speed;
-      p.y += Math.sin(p.angle) * p.speed * state.speed;
-      p.life += 0.003 * state.speed;
-
-      if (p.x > canvas.width || p.x < 0 || p.y > canvas.height || p.y < 0 || p.life > p.maxLife) {
-        p.x = Math.random() * canvas.width;
-        p.y = p.angle < 0 ? canvas.height + 10 : -10;
-        p.life = 0;
-      }
-
-      const alpha = Math.sin(p.life / p.maxLife * Math.PI) * 0.6;
-      windCtx.beginPath();
-      windCtx.arc(p.x, p.y, 1, 0, Math.PI * 2);
-      windCtx.fillStyle = `rgba(180, 210, 230, ${alpha})`;
-      windCtx.fill();
-    });
-
-    requestAnimationFrame(drawWind);
-  }
-  drawWind();
-}
-
-// ═══════════════════════════════════════════════
-//  CONTROLS
-// ═══════════════════════════════════════════════
-function selectStrategy(s) {
-  state.strategy = s;
-  document.querySelectorAll('.strategy-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.strategy === s);
-  });
-  // Reset idle drones to re-assign with new strategy
-  state.drones.forEach(d => {
-    if (d.status === 'idle') d.targetFire = null;
-  });
-}
-
-function togglePlay() {
-  state.running = !state.running;
-  const btn = document.querySelector('.play-btn');
-  const dot = document.getElementById('sim-dot');
-  if (state.running) {
-    btn.classList.add('active');
-    btn.classList.remove('pause-btn');
-    document.getElementById('play-icon').textContent = '▶';
-    document.getElementById('play-text').textContent = 'RUNNING';
-    dot.classList.remove('paused');
-  } else {
-    btn.classList.remove('active');
-    btn.classList.add('pause-btn', 'active');
-    document.getElementById('play-icon').textContent = '⏸';
-    document.getElementById('play-text').textContent = 'PAUSED';
-    dot.classList.add('paused');
-  }
-}
-
-function resetSim() {
-  state.simTime = 0;
-  state.fires.forEach(f => { f.suppressed = false; f.suppressTime = null; });
-  state.drones.forEach(d => {
-    d.lng = BASE[0] + (Math.random()-0.5)*0.01;
-    d.lat = BASE[1] + (Math.random()-0.5)*0.01;
-    d.targetFire = null;
-    d.status = 'idle';
-    d.pathHistory = [];
-    d.suppressProgress = 0;
-  });
-  state.metrics = { suppressed: 0, areaPct: 0, avgResp: 0, util: 0 };
-  state.history = [];
-  updateMetricsUI();
-}
-
-function setSpeed(s, el) {
-  state.speed = s;
-  document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-}
-
-function toggleLayer(layer) {
-  state.layers[layer] = !state.layers[layer];
-  const track = document.getElementById('tog-' + layer);
-  track.classList.toggle('on', state.layers[layer]);
-}
-
-// Handle resize
-window.addEventListener('resize', () => {
-  const canvas = document.getElementById('wind-canvas');
-  if (canvas && canvas.parentElement) {
-    canvas.width = canvas.parentElement.clientWidth;
-    canvas.height = canvas.parentElement.clientHeight;
-  }
+buildGrid();
+map.on('load', () => {
+  renderDeck();
+  log('Landscape ready. Click a cell or press "Ignite Random Cell".');
 });
 </script>
 </body>

@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
 :root {
   --bg:#0a0c10;--bg2:#11141c;--bg3:#181c28;--border:#1e2436;
@@ -40,6 +41,18 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
 #map{width:100%;height:100%}
 .param-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
 .wui-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(124,77,255,.15);color:var(--purple);font-family:'JetBrains Mono',monospace;margin:1px}
+.results-table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:8px}
+.results-table th,.results-table td{padding:4px 6px;border:1px solid var(--border);text-align:right}
+.results-table th{background:var(--bg);color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-size:8px;text-align:center}
+.results-table td:first-child{text-align:left;color:var(--text);font-weight:600}
+.results-table tr.best td{color:var(--green)}
+.chart-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;overflow:hidden}
+.chart-box svg{width:100%;display:block}
+.progress-bar{width:100%;height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;background:var(--cyan);border-radius:3px;transition:width .3s}
+.strat-select{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.strat-chip{font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);cursor:pointer;font-family:'JetBrains Mono',monospace}
+.strat-chip.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08)}
 </style>
 </head>
 <body>
@@ -89,6 +102,34 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);over
     <button class="btn btn-fire" onclick="igniteRandom()">Ignite Random Cell</button>
     <button class="btn" onclick="resetFire()">Reset Fire</button>
     <div id="fire-log"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Experiment</div>
+    <div class="row"><span>Fleet size</span><span class="v"><input id="fleet-size" type="number" min="2" max="12" value="6" style="width:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;border-radius:4px;padding:2px"> Burnbots</span></div>
+    <div class="row"><span>MC runs</span><span class="v">100 per strategy</span></div>
+    <div class="row"><span>Campaign</span><span class="v">2 weeks (140 hrs/unit)</span></div>
+    <button class="btn" id="btn-run" onclick="runExperiment()">Run Experiment</button>
+    <div class="progress-bar" id="prog-wrap" style="display:none"><div class="progress-fill" id="prog"></div></div>
+    <div id="run-status" style="font-size:10px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace"></div>
+  </div>
+
+  <div class="section" id="sec-results" style="display:none">
+    <div class="section-label">Results — Strategy Comparison</div>
+    <div id="results-table-wrap"></div>
+    <div class="section-label" style="margin-top:12px">Damage by Strategy</div>
+    <div class="chart-box" id="chart-damage" style="height:160px"></div>
+    <div class="section-label" style="margin-top:12px">Pareto Front (WUI vs Wildland)</div>
+    <div class="chart-box" id="chart-pareto" style="height:160px"></div>
+    <div class="section-label" style="margin-top:12px">Efficiency Metrics</div>
+    <div id="efficiency-table-wrap"></div>
+    <div class="section-label" style="margin-top:12px">Robustness by Ignition Stratum</div>
+    <div id="stratum-table-wrap"></div>
+  </div>
+
+  <div class="section" id="sec-map-strat" style="display:none">
+    <div class="section-label">View Treatment Map</div>
+    <div class="strat-select" id="strat-chips"></div>
   </div>
 
   <div class="section">
@@ -671,6 +712,468 @@ function renderDeck() {
 }
 
 // ═══════════════════════════════════════════════════════
+//  TREATMENT STRATEGIES
+// ═══════════════════════════════════════════════════════
+// Each returns a Set of cell indices to treat, given a budget in acres.
+
+function strategyHousingProtection(budget) {
+  // Treat operable cells closest to WUI, ranked by wuiWeight
+  const cands = cells.filter(c => c.operable !== 'no' && c.wuiWeight > 0)
+    .sort((a, b) => b.wuiWeight - a.wuiWeight);
+  return allocateBudget(cands, budget);
+}
+
+function strategyHighestFuel(budget) {
+  const cands = cells.filter(c => c.operable !== 'no')
+    .sort((a, b) => b.fuel - a.fuel);
+  return allocateBudget(cands, budget);
+}
+
+function strategyFireTransmission(budget) {
+  // Score cells by: how likely fire passes through here AND reaches WUI
+  // Proxy: ignProb × fuel × (inverse distance to nearest WUI)
+  const scored = cells.filter(c => c.operable !== 'no').map(c => {
+    let minWuiDist = Infinity;
+    for (const [, clat, clng] of COMMUNITIES) {
+      const d = Math.hypot(c.lat - clat, c.lng - clng);
+      if (d < minWuiDist) minWuiDist = d;
+    }
+    const transmissionScore = c.fuel * c.ignProb / (minWuiDist + 0.01);
+    return { ...c, transmissionScore };
+  }).sort((a, b) => b.transmissionScore - a.transmissionScore);
+  return allocateBudget(scored, budget);
+}
+
+function strategyDPV(budget) {
+  // Compute DPV: run quick fire sims, score each cell by damage prevented if treated
+  // Use 20 quick sims for DPV estimation
+  const dpvScores = new Float32Array(cells.length);
+  const sampleIgnitions = generateIgnitionSet(20);
+
+  // Baseline: run sims with no treatment
+  const baselines = [];
+  for (const ign of sampleIgnitions) {
+    const weather = sampleWeather();
+    baselines.push(simulateFire(ign.idx, weather, null));
+  }
+
+  // For each operable cell, estimate damage reduction if treated
+  const operableCells = cells.filter(c => c.operable !== 'no');
+  // Sample subset for speed (test top candidates by fuel × ignProb)
+  const testCells = operableCells
+    .sort((a, b) => (b.fuel * b.ignProb + b.wuiWeight * 0.1) - (a.fuel * a.ignProb + a.wuiWeight * 0.1))
+    .slice(0, Math.min(300, operableCells.length));
+
+  for (const tc of testCells) {
+    const treated = new Set([tc.idx]);
+    let totalReduction = 0;
+    for (let i = 0; i < sampleIgnitions.length; i++) {
+      const weather = sampleWeather();
+      const result = simulateFire(sampleIgnitions[i].idx, weather, treated);
+      totalReduction += baselines[i].totalDamage - result.totalDamage;
+    }
+    dpvScores[tc.idx] = totalReduction / sampleIgnitions.length;
+  }
+
+  const ranked = testCells
+    .map(c => ({ ...c, dpv: dpvScores[c.idx] }))
+    .sort((a, b) => b.dpv - a.dpv);
+  return allocateBudget(ranked, budget);
+}
+
+function strategyConstrainedDPV(budget) {
+  // Like DPV but accounts for travel time between selected parcels
+  // Greedy: pick highest DPV cell, then next highest that doesn't cost too much travel
+  const dpvScores = new Float32Array(cells.length);
+  const sampleIgnitions = generateIgnitionSet(20);
+  const baselines = [];
+  for (const ign of sampleIgnitions) {
+    const weather = sampleWeather();
+    baselines.push(simulateFire(ign.idx, weather, null));
+  }
+
+  const operableCells = cells.filter(c => c.operable !== 'no');
+  const testCells = operableCells
+    .sort((a, b) => (b.fuel * b.ignProb + b.wuiWeight * 0.1) - (a.fuel * a.ignProb + a.wuiWeight * 0.1))
+    .slice(0, Math.min(300, operableCells.length));
+
+  for (const tc of testCells) {
+    const treated = new Set([tc.idx]);
+    let totalReduction = 0;
+    for (let i = 0; i < sampleIgnitions.length; i++) {
+      const weather = sampleWeather();
+      const result = simulateFire(sampleIgnitions[i].idx, weather, treated);
+      totalReduction += baselines[i].totalDamage - result.totalDamage;
+    }
+    dpvScores[tc.idx] = totalReduction / sampleIgnitions.length;
+  }
+
+  // Greedy allocation with travel penalty
+  const ranked = testCells.map(c => ({ ...c, dpv: dpvScores[c.idx] }))
+    .sort((a, b) => b.dpv - a.dpv);
+
+  const selected = new Set();
+  let acresUsed = 0;
+  let lastCell = null;
+  const travelSpeed = 20; // km/h
+  const hoursPerUnit = 140;
+  const fleetSize = parseInt(document.getElementById('fleet-size').value) || 6;
+  let totalHours = hoursPerUnit * fleetSize;
+
+  for (const c of ranked) {
+    // Travel cost from last cell
+    let travelHrs = 0;
+    if (lastCell) {
+      const distKm = Math.hypot(c.lat - lastCell.lat, c.lng - lastCell.lng) * 111.32;
+      travelHrs = distKm / travelSpeed;
+    }
+    const treatHrs = CELL_AREA_ACRES / 1; // 1 acre/hr
+    const cost = travelHrs + treatHrs;
+
+    if (acresUsed + CELL_AREA_ACRES > budget) break;
+    if (totalHours - cost < 0) break;
+
+    selected.add(c.idx);
+    acresUsed += CELL_AREA_ACRES;
+    totalHours -= cost;
+    lastCell = c;
+  }
+  return { treated: selected, acresTreated: acresUsed };
+}
+
+// Budget allocator: greedy, accounts for travel time
+function allocateBudget(rankedCells, budget) {
+  const selected = new Set();
+  let acresUsed = 0;
+  const fleetSize = parseInt(document.getElementById('fleet-size').value) || 6;
+  let totalHours = 140 * fleetSize;
+  let lastCell = null;
+
+  for (const c of rankedCells) {
+    if (c.operable === 'no') continue;
+    let travelHrs = 0;
+    if (lastCell) {
+      const distKm = Math.hypot(c.lat - lastCell.lat, c.lng - lastCell.lng) * 111.32;
+      travelHrs = distKm / 20;
+    }
+    const treatHrs = CELL_AREA_ACRES;
+    if (totalHours - travelHrs - treatHrs < 0) break;
+    if (acresUsed + CELL_AREA_ACRES > budget) break;
+
+    selected.add(c.idx);
+    acresUsed += CELL_AREA_ACRES;
+    totalHours -= (travelHrs + treatHrs);
+    lastCell = c;
+  }
+  return { treated: selected, acresTreated: acresUsed };
+}
+
+// ═══════════════════════════════════════════════════════
+//  MONTE CARLO RUNNER
+// ═══════════════════════════════════════════════════════
+let experimentResults = null;
+
+async function runExperiment() {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  const progWrap = document.getElementById('prog-wrap');
+  const prog = document.getElementById('prog');
+  const status = document.getElementById('run-status');
+  progWrap.style.display = 'block';
+
+  const fleetSize = parseInt(document.getElementById('fleet-size').value) || 6;
+  const budget = fleetSize * 140; // acres
+  const N = 100;
+
+  // Generate fixed ignition set
+  status.textContent = 'Generating ignition set...';
+  const ignitions = generateIgnitionSet(N);
+
+  // Pre-sample weather for each run (shared across strategies)
+  const weathers = [];
+  for (let i = 0; i < N; i++) weathers.push(sampleWeather());
+
+  // Run baseline (no treatment)
+  status.textContent = 'Running baseline (no treatment)...';
+  prog.style.width = '0%';
+  await sleep(10);
+
+  const baselineResults = [];
+  for (let i = 0; i < N; i++) {
+    baselineResults.push(simulateFire(ignitions[i].idx, weathers[i], null));
+    if (i % 10 === 0) { prog.style.width = (i/N*10) + '%'; await sleep(1); }
+  }
+
+  // Define strategies
+  const strategies = [
+    { name: 'Housing Protection', fn: strategyHousingProtection },
+    { name: 'Fire Transmission', fn: strategyFireTransmission },
+    { name: 'Highest Fuel', fn: strategyHighestFuel },
+    { name: 'DPV-Optimal', fn: strategyDPV },
+    { name: 'Constrained DPV', fn: strategyConstrainedDPV },
+  ];
+
+  const results = {};
+  const treatmentMaps = {};
+
+  for (let s = 0; s < strategies.length; s++) {
+    const strat = strategies[s];
+    status.textContent = `Running: ${strat.name}...`;
+    await sleep(10);
+
+    // Generate treatment set
+    const allocation = strat.fn(budget);
+    const treatedSet = allocation.treated;
+    const acresTreated = allocation.acresTreated;
+    treatmentMaps[strat.name] = treatedSet;
+
+    // Run MC
+    const runs = [];
+    for (let i = 0; i < N; i++) {
+      const res = simulateFire(ignitions[i].idx, weathers[i], treatedSet);
+      res.stratum = ignitions[i].stratum;
+      res.weather = weathers[i].event;
+      runs.push(res);
+      if (i % 10 === 0) {
+        const pct = 10 + (s * 18) + (i / N * 18);
+        prog.style.width = pct + '%';
+        await sleep(1);
+      }
+    }
+
+    // Compute summary stats
+    const totalDamages = runs.map(r => r.totalDamage);
+    const wuiDamages = runs.map(r => r.wuiDamage);
+    const wildlandBurns = runs.map(r => r.wildlandBurned);
+
+    const baselineMeanDmg = mean(baselineResults.map(r => r.totalDamage));
+    const baselineMeanWui = mean(baselineResults.map(r => r.wuiDamage));
+
+    // Stratum breakdown
+    const byStratum = {};
+    for (let q = 1; q <= 4; q++) {
+      const stratumRuns = runs.filter(r => r.stratum === q);
+      const stratumBase = baselineResults.filter((_, i) => ignitions[i].stratum === q);
+      byStratum[q] = {
+        meanDamage: mean(stratumRuns.map(r => r.totalDamage)),
+        meanWui: mean(stratumRuns.map(r => r.wuiDamage)),
+        baselineDamage: mean(stratumBase.map(r => r.totalDamage)),
+        n: stratumRuns.length
+      };
+    }
+
+    results[strat.name] = {
+      runs,
+      acresTreated,
+      cellsTreated: treatedSet.size,
+      meanDamage: mean(totalDamages),
+      sdDamage: stddev(totalDamages),
+      meanWui: mean(wuiDamages),
+      sdWui: stddev(wuiDamages),
+      meanWildland: mean(wildlandBurns),
+      sdWildland: stddev(wildlandBurns),
+      damageReduction: (1 - mean(totalDamages) / baselineMeanDmg) * 100,
+      wuiReduction: (1 - mean(wuiDamages) / baselineMeanWui) * 100,
+      wuiSavedPerAcre: (baselineMeanWui - mean(wuiDamages)) / acresTreated,
+      wildlandCost: baselineMeanDmg > 0 ? (mean(wildlandBurns) - mean(baselineResults.map(r=>r.wildlandBurned))) / Math.max(1, baselineMeanWui - mean(wuiDamages)) : 0,
+      byStratum
+    };
+  }
+
+  // Baseline stats
+  results['No Treatment'] = {
+    acresTreated: 0, cellsTreated: 0,
+    meanDamage: mean(baselineResults.map(r => r.totalDamage)),
+    sdDamage: stddev(baselineResults.map(r => r.totalDamage)),
+    meanWui: mean(baselineResults.map(r => r.wuiDamage)),
+    sdWui: stddev(baselineResults.map(r => r.wuiDamage)),
+    meanWildland: mean(baselineResults.map(r => r.wildlandBurned)),
+    sdWildland: stddev(baselineResults.map(r => r.wildlandBurned)),
+    damageReduction: 0, wuiReduction: 0, wuiSavedPerAcre: 0, wildlandCost: 0,
+    byStratum: {}
+  };
+
+  experimentResults = { results, treatmentMaps, ignitions, weathers, baselineResults, fleetSize, budget };
+
+  prog.style.width = '100%';
+  status.textContent = `Done. ${N} runs × ${strategies.length} strategies.`;
+  btn.disabled = false;
+  btn.textContent = 'Run Experiment';
+
+  renderResults();
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function mean(arr) { return arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0; }
+function stddev(arr) { const m = mean(arr); return Math.sqrt(mean(arr.map(x => (x-m)*(x-m)))); }
+
+// ═══════════════════════════════════════════════════════
+//  RENDER RESULTS
+// ═══════════════════════════════════════════════════════
+function renderResults() {
+  if (!experimentResults) return;
+  const { results, treatmentMaps } = experimentResults;
+  document.getElementById('sec-results').style.display = '';
+  document.getElementById('sec-map-strat').style.display = '';
+
+  // --- Main comparison table ---
+  const stratNames = ['No Treatment', 'Housing Protection', 'Fire Transmission', 'Highest Fuel', 'DPV-Optimal', 'Constrained DPV'];
+  let bestName = '';
+  let bestDmg = Infinity;
+  for (const n of stratNames) {
+    if (n !== 'No Treatment' && results[n] && results[n].meanDamage < bestDmg) {
+      bestDmg = results[n].meanDamage; bestName = n;
+    }
+  }
+
+  let html = '<table class="results-table"><tr><th>Strategy</th><th>Damage</th><th>±SD</th><th>WUI Dmg</th><th>Wildland</th><th>Acres</th><th>Reduction</th></tr>';
+  for (const n of stratNames) {
+    const r = results[n];
+    if (!r) continue;
+    const cls = n === bestName ? ' class="best"' : '';
+    html += `<tr${cls}><td>${n}</td><td>${r.meanDamage.toFixed(0)}</td><td>${r.sdDamage.toFixed(0)}</td><td>${r.meanWui.toFixed(1)}</td><td>${r.meanWildland.toFixed(0)}</td><td>${r.acresTreated.toFixed(0)}</td><td>${r.damageReduction.toFixed(1)}%</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('results-table-wrap').innerHTML = html;
+
+  // --- Efficiency table ---
+  let ehtml = '<table class="results-table"><tr><th>Strategy</th><th>WUI Saved/Acre</th><th>Wildland Cost/WUI</th><th>WUI Reduction</th></tr>';
+  for (const n of stratNames) {
+    const r = results[n];
+    if (!r || n === 'No Treatment') continue;
+    ehtml += `<tr><td>${n}</td><td>${r.wuiSavedPerAcre.toFixed(3)}</td><td>${r.wildlandCost.toFixed(2)}</td><td>${r.wuiReduction.toFixed(1)}%</td></tr>`;
+  }
+  ehtml += '</table>';
+  document.getElementById('efficiency-table-wrap').innerHTML = ehtml;
+
+  // --- Stratum table ---
+  let shtml = '<table class="results-table"><tr><th>Strategy</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr>';
+  for (const n of stratNames) {
+    const r = results[n];
+    if (!r || n === 'No Treatment' || !r.byStratum[1]) continue;
+    shtml += `<tr><td>${n}</td>`;
+    for (let q = 1; q <= 4; q++) {
+      const bs = r.byStratum[q];
+      const red = bs.baselineDamage > 0 ? ((1 - bs.meanDamage / bs.baselineDamage) * 100).toFixed(0) : '—';
+      shtml += `<td>${red}%</td>`;
+    }
+    shtml += '</tr>';
+  }
+  shtml += '</table>';
+  document.getElementById('stratum-table-wrap').innerHTML = shtml;
+
+  // --- Damage bar chart ---
+  renderDamageChart(results, stratNames);
+
+  // --- Pareto chart ---
+  renderParetoChart(results, stratNames);
+
+  // --- Strategy map chips ---
+  const chips = document.getElementById('strat-chips');
+  chips.innerHTML = '';
+  for (const n of stratNames) {
+    if (n === 'No Treatment' || !treatmentMaps[n]) continue;
+    const chip = document.createElement('span');
+    chip.className = 'strat-chip';
+    chip.textContent = n;
+    chip.onclick = () => showTreatmentMap(n);
+    chips.appendChild(chip);
+  }
+}
+
+function renderDamageChart(results, names) {
+  const container = document.getElementById('chart-damage');
+  container.innerHTML = '';
+  const W = container.clientWidth - 4, H = 150;
+  const margin = { t: 10, r: 10, b: 40, l: 50 };
+
+  const data = names.filter(n => results[n]).map(n => ({
+    name: n.replace('No Treatment', 'None').replace('Housing Protection', 'Housing').replace('Fire Transmission', 'Transmit').replace('Highest Fuel', 'Fuel').replace('DPV-Optimal', 'DPV').replace('Constrained DPV', 'C-DPV'),
+    mean: results[n].meanDamage,
+    sd: results[n].sdDamage
+  }));
+
+  const svg = d3.select(container).append('svg').attr('width', W).attr('height', H);
+  const x = d3.scaleBand().domain(data.map(d => d.name)).range([margin.l, W - margin.r]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.mean + d.sd) * 1.1]).range([H - margin.b, margin.t]);
+
+  const colors = ['#666', '#7c4dff', '#ff8c42', '#f44336', '#00e5ff', '#00e676'];
+
+  svg.selectAll('rect').data(data).join('rect')
+    .attr('x', d => x(d.name)).attr('y', d => y(d.mean))
+    .attr('width', x.bandwidth()).attr('height', d => H - margin.b - y(d.mean))
+    .attr('fill', (d, i) => colors[i]).attr('rx', 2);
+
+  // Error bars
+  svg.selectAll('.err').data(data).join('line').attr('class', 'err')
+    .attr('x1', d => x(d.name) + x.bandwidth()/2).attr('x2', d => x(d.name) + x.bandwidth()/2)
+    .attr('y1', d => y(d.mean + d.sd)).attr('y2', d => y(Math.max(0, d.mean - d.sd)))
+    .attr('stroke', '#fff').attr('stroke-width', 1).attr('opacity', 0.5);
+
+  svg.append('g').attr('transform', `translate(0,${H-margin.b})`).call(d3.axisBottom(x))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px').attr('transform', 'rotate(-20)').style('text-anchor', 'end');
+  svg.append('g').attr('transform', `translate(${margin.l},0)`).call(d3.axisLeft(y).ticks(4))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px');
+  svg.selectAll('.domain,.tick line').style('stroke', '#1e2436');
+}
+
+function renderParetoChart(results, names) {
+  const container = document.getElementById('chart-pareto');
+  container.innerHTML = '';
+  const W = container.clientWidth - 4, H = 150;
+  const margin = { t: 10, r: 10, b: 30, l: 50 };
+
+  const data = names.filter(n => results[n] && n !== 'No Treatment').map(n => ({
+    name: n, wui: results[n].meanWui, wildland: results[n].meanWildland
+  }));
+  // Add baseline
+  data.push({ name: 'None', wui: results['No Treatment'].meanWui, wildland: results['No Treatment'].meanWildland });
+
+  const svg = d3.select(container).append('svg').attr('width', W).attr('height', H);
+  const x = d3.scaleLinear().domain([0, d3.max(data, d => d.wildland) * 1.1]).range([margin.l, W - margin.r]);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.wui) * 1.1]).range([H - margin.b, margin.t]);
+
+  const colors = { 'Housing Protection': '#7c4dff', 'Fire Transmission': '#ff8c42', 'Highest Fuel': '#f44336', 'DPV-Optimal': '#00e5ff', 'Constrained DPV': '#00e676', 'None': '#666' };
+
+  svg.selectAll('circle').data(data).join('circle')
+    .attr('cx', d => x(d.wildland)).attr('cy', d => y(d.wui))
+    .attr('r', 5).attr('fill', d => colors[d.name] || '#888');
+
+  svg.selectAll('.lbl').data(data).join('text').attr('class', 'lbl')
+    .attr('x', d => x(d.wildland) + 7).attr('y', d => y(d.wui) + 3)
+    .text(d => d.name.replace('Housing Protection', 'Housing').replace('Fire Transmission', 'Transmit').replace('Highest Fuel', 'Fuel').replace('Constrained DPV', 'C-DPV').replace('DPV-Optimal', 'DPV'))
+    .style('fill', '#7a8299').style('font-size', '8px').style('font-family', 'JetBrains Mono');
+
+  svg.append('g').attr('transform', `translate(0,${H-margin.b})`).call(d3.axisBottom(x).ticks(5))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px');
+  svg.append('g').attr('transform', `translate(${margin.l},0)`).call(d3.axisLeft(y).ticks(4))
+    .selectAll('text').style('fill', '#7a8299').style('font-size', '8px');
+  svg.selectAll('.domain,.tick line').style('stroke', '#1e2436');
+
+  // Axis labels
+  svg.append('text').attr('x', W/2).attr('y', H - 2).text('Wildland Burned (cells)').style('fill', '#4a5068').style('font-size', '8px').style('text-anchor', 'middle').style('font-family', 'JetBrains Mono');
+  svg.append('text').attr('transform', 'rotate(-90)').attr('x', -H/2).attr('y', 10).text('WUI Damage').style('fill', '#4a5068').style('font-size', '8px').style('text-anchor', 'middle').style('font-family', 'JetBrains Mono');
+}
+
+function showTreatmentMap(stratName) {
+  if (!experimentResults) return;
+  // Reset visual state
+  for (const c of cells) { c.burning = false; c.burned = false; c.treated = false; }
+  // Apply treatment
+  const treatedSet = experimentResults.treatmentMaps[stratName];
+  if (treatedSet) {
+    for (const idx of treatedSet) cells[idx].treated = true;
+  }
+  // Highlight chips
+  document.querySelectorAll('.strat-chip').forEach(ch => {
+    ch.classList.toggle('on', ch.textContent === stratName);
+  });
+  renderDeck();
+  log(`Showing treatment map: ${stratName} (${treatedSet ? treatedSet.size : 0} cells treated)`);
+}
+
+// ═══════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════
 buildGrid();
@@ -678,7 +1181,7 @@ map.on('load', () => {
   renderDeck();
   log(`Landscape: ${cells.length} cells, ${cells.filter(c=>c.operable!=='no').length} operable, ${cells.filter(c=>c.wuiWeight>0).length} WUI`);
   log('Click a cell to ignite or press "Ignite Random Cell".');
-  log('Rothermel params shown in sidebar. Step 2 adds experiment engine.');
+  log('Rothermel params in sidebar. Click "Run Experiment" to compare strategies.');
 });
 </script>
 </body>

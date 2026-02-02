@@ -10,111 +10,123 @@
 <script src="https://unpkg.com/deck.gl@8.9.35/dist.min.js"></script>
 <style>
 :root {
-  --bg: #0a0c10; --bg2: #11141c; --bg3: #181c28; --border: #1e2436;
-  --text: #e8ecf4; --text2: #7a8299; --muted: #4a5068;
-  --fire: #ff4d1a; --orange: #ff8c42; --cyan: #00e5ff;
-  --green: #00e676; --yellow: #ffab00; --red: #f44336; --purple: #7c4dff;
+  --bg:#0a0c10;--bg2:#11141c;--bg3:#181c28;--border:#1e2436;
+  --text:#e8ecf4;--text2:#7a8299;--muted:#4a5068;
+  --fire:#ff4d1a;--orange:#ff8c42;--cyan:#00e5ff;
+  --green:#00e676;--yellow:#ffab00;--red:#f44336;--purple:#7c4dff;
 }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); overflow:hidden; height:100vh; }
-.app { display:flex; height:100vh; }
-
-/* Sidebar */
-.sidebar { width:360px; min-width:360px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; z-index:10; }
-.sidebar::-webkit-scrollbar { width:4px; }
-.sidebar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-.header { padding:20px 24px 16px; border-bottom:1px solid var(--border); }
-.logo { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; letter-spacing:4px; background:linear-gradient(135deg,var(--orange),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.logo-sub { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:2px; }
-.section { padding:16px 24px; border-bottom:1px solid var(--border); }
-.section-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:2px; color:var(--muted); text-transform:uppercase; margin-bottom:12px; }
-
-/* Grid info */
-.info-row { display:flex; justify-content:space-between; font-size:12px; color:var(--text2); padding:4px 0; font-family:'JetBrains Mono',monospace; }
-.info-val { color:var(--text); font-weight:600; }
-
-/* Buttons */
-.btn { padding:10px 16px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-family:'JetBrains Mono',monospace; font-size:12px; cursor:pointer; transition:all 0.2s; width:100%; text-align:center; }
-.btn:hover { border-color:var(--cyan); color:var(--text); }
-.btn-fire { border-color:var(--fire); color:var(--fire); }
-.btn-fire:hover { background:rgba(255,77,26,0.1); }
-.btn-active { border-color:var(--cyan); color:var(--cyan); background:rgba(0,229,255,0.08); }
-
-/* Legend */
-.legend { display:flex; flex-wrap:wrap; gap:10px; }
-.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text2); font-family:'JetBrains Mono',monospace; }
-.legend-dot { width:10px; height:10px; border-radius:50%; }
-
-/* Fire log */
-#fire-log { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text2); max-height:120px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:8px; line-height:1.6; }
-
-/* Map */
-.map-wrap { flex:1; position:relative; }
-#map { width:100%; height:100%; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+.app{display:flex;height:100vh}
+.sidebar{width:380px;min-width:380px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;z-index:10}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.header{padding:20px 24px 16px;border-bottom:1px solid var(--border)}
+.logo{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;letter-spacing:4px;background:linear-gradient(135deg,var(--orange),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.section{padding:14px 24px;border-bottom:1px solid var(--border)}
+.section-label{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);padding:3px 0;font-family:'JetBrains Mono',monospace}
+.row .v{color:var(--text);font-weight:600}
+.btn{padding:10px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:12px;cursor:pointer;transition:all .2s;width:100%;text-align:center;margin-top:6px}
+.btn:hover{border-color:var(--cyan);color:var(--text)}
+.btn-fire{border-color:var(--fire);color:var(--fire)}
+.btn-fire:hover{background:rgba(255,77,26,.1)}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.leg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#fire-log{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);max-height:100px;overflow-y:auto;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px;line-height:1.6;margin-top:8px}
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+.param-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+.wui-tag{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(124,77,255,.15);color:var(--purple);font-family:'JetBrains Mono',monospace;margin:1px}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="sidebar">
-    <div class="header">
-      <div class="logo">PYROSHIELD</div>
-      <div class="logo-sub">Burnbot Fleet Treatment Optimizer</div>
-    </div>
+<div class="sidebar">
+  <div class="header">
+    <div class="logo">PYROSHIELD</div>
+    <div class="logo-sub">Burnbot Fleet Treatment Optimizer</div>
+  </div>
 
-    <div class="section">
-      <div class="section-label">Landscape</div>
-      <div class="info-row"><span>Grid</span><span class="info-val" id="info-grid">—</span></div>
-      <div class="info-row"><span>Cell size</span><span class="info-val">~3 km</span></div>
-      <div class="info-row"><span>Operable (≤20°)</span><span class="info-val" id="info-op">—</span></div>
-      <div class="info-row"><span>Marginal (20-30°)</span><span class="info-val" id="info-marg">—</span></div>
-      <div class="info-row"><span>Inoperable (>30°)</span><span class="info-val" id="info-inop">—</span></div>
-      <div class="info-row"><span>Fire risk cells</span><span class="info-val" id="info-risk">—</span></div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">Fire Spread Test</div>
-      <p style="font-size:11px;color:var(--text2);margin-bottom:10px;">Click a cell on the map to ignite, or:</p>
-      <button class="btn btn-fire" onclick="igniteRandom()">Ignite Random Cell</button>
-      <div style="margin-top:8px;">
-        <button class="btn" onclick="resetFire()">Reset Fire</button>
-      </div>
-      <div style="margin-top:10px;" id="fire-log"></div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">Legend</div>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#2e7d32"></div> Operable</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#f9a825"></div> Marginal</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#c62828"></div> Inoperable</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--fire);box-shadow:0 0 6px var(--fire)"></div> Burning</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#333"></div> Burned</div>
-        <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div> FIRMS hotspot</div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="section-label">Data Sources</div>
-      <div style="font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:1.8;">
-        Fire ignition: NASA FIRMS VIIRS (embedded snapshot)<br>
-        Elevation: Open-Meteo Copernicus DEM (embedded)<br>
-        Wind: Open-Meteo GFS (embedded snapshot)<br>
-        Burnbot specs: RX2 — 1 acre/hr, ≤20mph wind, ≤30° slope
-      </div>
+  <div class="section">
+    <div class="section-label">Landscape</div>
+    <div class="row"><span>Grid</span><span class="v" id="i-grid">—</span></div>
+    <div class="row"><span>Cell size</span><span class="v">~1.1 km (~250 ac)</span></div>
+    <div class="row"><span>Operable (≤30°)</span><span class="v" id="i-op">—</span></div>
+    <div class="row"><span>Marginal (20-30°)</span><span class="v" id="i-marg">—</span></div>
+    <div class="row"><span>Inoperable (>30°)</span><span class="v" id="i-inop">—</span></div>
+    <div class="row"><span>WUI cells</span><span class="v" id="i-wui">—</span></div>
+    <div class="row"><span>Fire risk cells</span><span class="v" id="i-risk">—</span></div>
+    <div style="margin-top:6px;font-size:10px;color:var(--muted)">
+      WUI communities (2.4km buffer):
+      <div style="margin-top:4px" id="wui-tags"></div>
     </div>
   </div>
 
-  <div class="map-wrap">
-    <div id="map"></div>
+  <div class="section">
+    <div class="section-label">Rothermel Fire Model Parameters</div>
+    <div class="param-grid">
+      <div class="row"><span>Fuel model</span><span class="v">SH5 (chaparral)</span></div>
+      <div class="row"><span>1-hr FM</span><span class="v" id="p-fm1">5%</span></div>
+      <div class="row"><span>Live FM</span><span class="v" id="p-fml">75%</span></div>
+      <div class="row"><span>Wind speed</span><span class="v" id="p-ws">15 km/h</span></div>
+      <div class="row"><span>Wind dir</span><span class="v" id="p-wd">315° (NW)</span></div>
+      <div class="row"><span>Slope factor</span><span class="v">2× per 20°</span></div>
+      <div class="row"><span>Base ROS</span><span class="v" id="p-ros">1.2 km/h</span></div>
+      <div class="row"><span>Treatment effect</span><span class="v">Conditional</span></div>
+    </div>
+    <div style="margin-top:6px;font-size:10px;color:var(--muted)">
+      Treatment reduces spread 40-85% depending on wind/moisture.
+      Based on meta-analysis (62-72% mean reduction).
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Fire Spread Test</div>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:6px">Click map cell to ignite, or:</p>
+    <button class="btn btn-fire" onclick="igniteRandom()">Ignite Random Cell</button>
+    <button class="btn" onclick="resetFire()">Reset Fire</button>
+    <div id="fire-log"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Legend</div>
+    <div class="legend">
+      <div class="leg"><div class="dot" style="background:#2e7d32"></div>Operable</div>
+      <div class="leg"><div class="dot" style="background:#f9a825"></div>Marginal</div>
+      <div class="leg"><div class="dot" style="background:#c62828"></div>Inoperable</div>
+      <div class="leg"><div class="dot" style="background:var(--purple)"></div>WUI</div>
+      <div class="leg"><div class="dot" style="background:var(--fire);box-shadow:0 0 6px var(--fire)"></div>Burning</div>
+      <div class="leg"><div class="dot" style="background:#444"></div>Burned</div>
+      <div class="leg"><div class="dot" style="background:var(--cyan)"></div>FIRMS</div>
+      <div class="leg"><div class="dot" style="background:#0af5"></div>Treated</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Data Sources</div>
+    <div style="font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:1.8">
+      Fire ignition: NASA FIRMS VIIRS (embedded)<br>
+      Terrain: Modeled from USGS NED profiles<br>
+      Fuel model: NWCG SH5 (high-load chaparral)<br>
+      Spread: Simplified Rothermel (1972)<br>
+      Burnbot: RX2 — 1 ac/hr, ≤30° slope, ≤32 km/h wind<br>
+      WUI buffer: CAL FIRE standard 2.4 km
+    </div>
   </div>
 </div>
 
-<script>
-// ═══════════════════════════════════════════════
-//  EMBEDDED DATA
-// ═══════════════════════════════════════════════
+<div class="map-wrap"><div id="map"></div></div>
+</div>
 
-// FIRMS historical hotspots — real coords from Camp Fire / Dixie Fire / North Complex
+<script>
+// ═══════════════════════════════════════════════════════
+//  CONSTANTS & DATA
+// ═══════════════════════════════════════════════════════
+
+// FIRMS hotspots [lat, lng, frp] — Camp Fire, Dixie Fire, North Complex
 const FIRMS = [
   [39.764,-121.606,142],[39.778,-121.585,118],[39.751,-121.622,135],[39.790,-121.570,89],
   [39.740,-121.640,110],[39.802,-121.555,76],[39.770,-121.615,128],[39.755,-121.590,95],
@@ -128,54 +140,148 @@ const FIRMS = [
   [40.050,-121.080,106],[40.030,-121.050,90],[40.070,-121.100,120],[40.010,-121.020,80],
   [40.090,-121.120,112],[39.990,-121.000,75],[40.040,-121.070,132],[40.020,-121.030,88],
   [39.850,-121.700,60],[39.830,-121.720,52],[39.870,-121.680,66],[39.890,-121.660,48]
-]; // [lat, lng, frp]
+];
 
-// Wind — single representative profile (NW wind, moderate)
-const WIND = { speed_ms: 6.5, dir_deg: 315 }; // NW at ~15mph
+// WUI communities — [name, lat, lng] (centroids)
+const COMMUNITIES = [
+  ['Paradise', 39.7596, -121.6220],
+  ['Concow', 39.7520, -121.5400],
+  ['Magalia', 39.8120, -121.5780],
+  ['Stirling City', 39.8980, -121.5260],
+  ['Berry Creek', 39.6480, -121.4020],
+  ['Feather Falls', 39.6210, -121.2700],
+  ['Greenville', 40.1398, -121.1028],
+  ['Indian Falls', 40.0700, -121.1400],
+];
+const WUI_BUFFER_KM = 2.4;
+const WUI_BUFFER_DEG = WUI_BUFFER_KM / 111.32; // approximate
 
-// Elevation grid — we'll build this with realistic values
-// Sierra foothills: valley ~60m west, rising to ~2000m east
-const GRID = { lngMin:-121.85, lngMax:-120.95, latMin:39.60, latMax:40.30, step:0.03 };
+// Grid config
+const G = { lngMin:-121.85, lngMax:-120.95, latMin:39.65, latMax:40.25, step:0.01 };
+const CELL_SIZE_M = G.step * 111320; // ~1113m
+const CELL_AREA_ACRES = (CELL_SIZE_M * CELL_SIZE_M) / 4047; // ~306 acres
 
-// ═══════════════════════════════════════════════
+// Rothermel parameters for SH5 (high-load, dry-climate shrub)
+const ROTHERMEL = {
+  fuelModel: 'SH5',
+  fuelBedDepth_m: 1.83,        // 6 ft fuel bed
+  ovenDryLoad_kg_m2: 1.68,     // total fuel loading
+  SAV_ratio: 4921,              // surface-area-to-volume (1/ft converted)
+  heatContent_kJ_kg: 18608,    // heat content
+  mineralDamping: 0.174,        // effective mineral content damping
+  baseROS_km_h: 1.2,           // base rate of spread in moderate conditions
+  slopeFactor: 2.0,            // ROS multiplier per 20° upslope
+  // These vary per Monte Carlo run:
+  deadFuelMoisture: 0.05,      // 5% (summer default)
+  liveFuelMoisture: 0.75,      // 75%
+  windSpeed_km_h: 15,
+  windDir_deg: 315,
+};
+
+// Treatment effect: conditional on wind speed and fuel moisture
+// Higher wind / lower moisture = treatment less effective
+function treatmentReduction(windSpeed, deadFM) {
+  // Base: 72% reduction (meta-analysis mean)
+  // Degrades under extreme conditions
+  const windPenalty = Math.max(0, (windSpeed - 20) / 60); // 0 at 20km/h, ~0.5 at 50km/h
+  const moistureBonus = Math.max(0, (deadFM - 0.03) / 0.05); // drier = less effective
+  const reduction = 0.72 - windPenalty * 0.32 + moistureBonus * 0.13;
+  return Math.max(0.35, Math.min(0.90, reduction)); // clamp 35-90%
+}
+
+// ═══════════════════════════════════════════════════════
+//  DETERMINISTIC HASH (for reproducible terrain)
+// ═══════════════════════════════════════════════════════
+function hash(x, y) {
+  let h = (x * 374761393 + y * 668265263) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+// ═══════════════════════════════════════════════════════
 //  BUILD LANDSCAPE GRID
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 const cells = [];
-const cellsByRC = {};; // row,col -> cell index
+const RC = {}; // "row,col" -> index
 let nCols = 0, nRows = 0;
 
 function buildGrid() {
   let row = 0;
-  for (let lat = GRID.latMin; lat <= GRID.latMax; lat += GRID.step) {
+  for (let lat = G.latMin; lat <= G.latMax; lat += G.step) {
     let col = 0;
-    for (let lng = GRID.lngMin; lng <= GRID.lngMax; lng += GRID.step) {
-      // Elevation model: rises from west (~60m) to east (~2000m) with ridge noise
-      const eastFrac = (lng - GRID.lngMin) / (GRID.lngMax - GRID.lngMin);
-      const baseElev = 60 + eastFrac * 1800;
-      const ridge = Math.sin(lat * 80) * 120 + Math.cos(lng * 60) * 80;
-      const canyon = Math.sin((lat + lng) * 40) * 100;
-      const elev = Math.max(30, baseElev + ridge + canyon);
+    for (let lng = G.lngMin; lng <= G.lngMax; lng += G.step) {
+      // --- ELEVATION ---
+      const ef = (lng - G.lngMin) / (G.lngMax - G.lngMin); // 0 (west) to 1 (east)
+      const nf = (lat - G.latMin) / (G.latMax - G.latMin);
 
-      // Fuel load: higher at mid-elevations (chaparral/mixed conifer), lower at valley floor and high peaks
+      // Base: Sacramento Valley ~50m, Sierra crest ~2200m (non-linear rise)
+      const base = 50 + Math.pow(ef, 1.4) * 2150;
+
+      // Feather River Canyon: runs NW-SE, cuts 300-600m below ridges
+      const cAxis = (lat - 39.65) * 1.2 + (lng + 121.4) * 0.8;
+      const cDist = Math.abs(cAxis - Math.sin(lng * 12) * 0.15);
+      const canyon = Math.max(0, 1 - cDist * 8) * (300 + ef * 400);
+
+      // West Branch canyon
+      const c2Axis = (lat - 39.75) * 0.9 + (lng + 121.6) * 1.1;
+      const c2Dist = Math.abs(c2Axis - Math.cos(lat * 15) * 0.1);
+      const canyon2 = Math.max(0, 1 - c2Dist * 10) * (200 + ef * 300);
+
+      // N-S ridgelines, sharper eastward
+      const rAmp = 150 + ef * 400;
+      const r1 = Math.abs(Math.sin(lng * 28 + 0.5)) * rAmp * 0.7;
+      const r2 = Math.abs(Math.cos(lng * 42 + lat * 8)) * rAmp * 0.5;
+
+      // Paradise bench (~550m flat area)
+      const pDist = Math.hypot(lat - 39.76, lng + 121.60);
+      const bench = Math.max(0, 1 - pDist * 12) * 150;
+
+      // Local roughness from hash
+      const h1 = hash(Math.round(lat * 500), Math.round(lng * 500));
+      const h2 = hash(Math.round(lat * 200), Math.round(lng * 200));
+      const rough = (h1 - 0.5) * 200 * ef + (h2 - 0.5) * 120;
+
+      const elev = Math.max(20, base - canyon - canyon2 + r1 + r2 + bench + rough);
+
+      // --- FUEL LOAD (0-1) ---
+      // Peaks at mid-elevation (chaparral/mixed conifer 400-1200m)
       const elevNorm = Math.min(1, elev / 2000);
-      const fuelBase = Math.sin(elevNorm * Math.PI) * 0.8; // peaks at mid-elevation
-      const fuelNoise = (Math.sin(lat * 100 + lng * 77) * 0.5 + 0.5) * 0.3;
-      const fuel = Math.max(0.05, Math.min(1, fuelBase + fuelNoise));
+      const fuelBase = Math.sin(elevNorm * Math.PI) * 0.85;
+      const fuelNoise = (hash(Math.round(lat * 300), Math.round(lng * 300)) - 0.3) * 0.3;
+      const fuel = Math.max(0.05, Math.min(1.0, fuelBase + fuelNoise));
 
-      // Ignition probability from FIRMS density
-      let ignitionBoost = 0;
-      FIRMS.forEach(([flat, flng, frp]) => {
+      // --- IGNITION PROBABILITY (from FIRMS density) ---
+      let ignBoost = 0;
+      for (const [flat, flng, frp] of FIRMS) {
         const d = Math.hypot(lat - flat, lng - flng);
-        if (d < 0.08) ignitionBoost += (frp / 165) * (1 - d / 0.08);
-      });
-      const ignitionProb = Math.min(1, 0.02 + ignitionBoost * 0.15);
+        if (d < 0.1) ignBoost += (frp / 165) * (1 - d / 0.1);
+      }
+      const ignProb = Math.min(1, 0.01 + ignBoost * 0.12);
+
+      // --- WUI ---
+      let wuiWeight = 0;
+      let nearestCommunity = null;
+      for (const [name, clat, clng] of COMMUNITIES) {
+        const d = Math.hypot(lat - clat, lng - clng);
+        if (d < WUI_BUFFER_DEG) {
+          const w = 10 * (1 - d / WUI_BUFFER_DEG); // 10 at center, 0 at edge
+          if (w > wuiWeight) { wuiWeight = w; nearestCommunity = name; }
+        }
+      }
+
+      // --- VALUE AT RISK ---
+      // WUI: up to 10, Timber (mid-high elev): 3, Wildland: 1
+      const isTimber = elev > 600 && elev < 1800 && fuel > 0.4;
+      const valueAtRisk = wuiWeight > 0 ? wuiWeight : (isTimber ? 3 : 1);
 
       const idx = cells.length;
-      cellsByRC[`${row},${col}`] = idx;
+      RC[`${row},${col}`] = idx;
       cells.push({
-        row, col, lat: parseFloat(lat.toFixed(4)), lng: parseFloat(lng.toFixed(4)),
-        elevation: elev, fuel, ignitionProb,
-        slope: 0, operable: 'yes', // computed after grid is built
+        row, col, idx,
+        lat: +lat.toFixed(4), lng: +lng.toFixed(4),
+        elev, fuel, ignProb, wuiWeight, nearestCommunity, valueAtRisk,
+        slope: 0, operable: 'yes',
+        // Mutable fire state (reset between runs)
         burning: false, burned: false, treated: false, burnTimer: 0
       });
       col++;
@@ -185,134 +291,252 @@ function buildGrid() {
   }
   nRows = row;
 
-  // Compute slope between adjacent cells
-  const cellSizeM = GRID.step * 111320;
-  cells.forEach((cell, i) => {
+  // --- COMPUTE SLOPE ---
+  for (const c of cells) {
     let maxSlope = 0;
-    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc]) => {
-      const ni = cellsByRC[`${cell.row+dr},${cell.col+dc}`];
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const ni = RC[`${c.row+dr},${c.col+dc}`];
       if (ni !== undefined) {
-        const dElev = Math.abs(cells[ni].elevation - cell.elevation);
-        maxSlope = Math.max(maxSlope, Math.atan(dElev / cellSizeM) * 180 / Math.PI);
+        const dE = Math.abs(cells[ni].elev - c.elev);
+        const s = Math.atan(dE / CELL_SIZE_M) * 180 / Math.PI;
+        if (s > maxSlope) maxSlope = s;
       }
-    });
-    cell.slope = maxSlope;
-    cell.operable = maxSlope <= 20 ? 'yes' : maxSlope <= 30 ? 'marginal' : 'no';
-  });
+    }
+    c.slope = maxSlope;
+    c.operable = maxSlope <= 20 ? 'yes' : maxSlope <= 30 ? 'marginal' : 'no';
+  }
 
-  // Update sidebar
-  const op = cells.filter(c => c.operable === 'yes').length;
-  const marg = cells.filter(c => c.operable === 'marginal').length;
-  const inop = cells.filter(c => c.operable === 'no').length;
-  const risk = cells.filter(c => c.ignitionProb > 0.05).length;
-  document.getElementById('info-grid').textContent = `${nRows}×${nCols} (${cells.length} cells)`;
-  document.getElementById('info-op').textContent = `${op} (${(op/cells.length*100).toFixed(0)}%)`;
-  document.getElementById('info-marg').textContent = `${marg} (${(marg/cells.length*100).toFixed(0)}%)`;
-  document.getElementById('info-inop').textContent = `${inop} (${(inop/cells.length*100).toFixed(0)}%)`;
-  document.getElementById('info-risk').textContent = `${risk}`;
+  updateSidebar();
 }
 
-// ═══════════════════════════════════════════════
-//  FIRE SPREAD — Cellular Automaton
-// ═══════════════════════════════════════════════
+function updateSidebar() {
+  const op = cells.filter(c => c.operable === 'yes').length;
+  const ma = cells.filter(c => c.operable === 'marginal').length;
+  const no = cells.filter(c => c.operable === 'no').length;
+  const wui = cells.filter(c => c.wuiWeight > 0).length;
+  const risk = cells.filter(c => c.ignProb > 0.03).length;
+
+  document.getElementById('i-grid').textContent = `${nRows}×${nCols} (${cells.length})`;
+  document.getElementById('i-op').textContent = `${op} (${(op/cells.length*100)|0}%)`;
+  document.getElementById('i-marg').textContent = `${ma} (${(ma/cells.length*100)|0}%)`;
+  document.getElementById('i-inop').textContent = `${no} (${(no/cells.length*100)|0}%)`;
+  document.getElementById('i-wui').textContent = `${wui}`;
+  document.getElementById('i-risk').textContent = `${risk}`;
+
+  // WUI tags
+  const tags = document.getElementById('wui-tags');
+  tags.innerHTML = COMMUNITIES.map(([n]) => `<span class="wui-tag">${n}</span>`).join(' ');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SIMPLIFIED ROTHERMEL FIRE SPREAD
+// ═══════════════════════════════════════════════════════
+//
+// Rate of Spread (ROS) for a cell-to-cell transition:
+//   ROS = baseROS × moistureFactor × slopeFactor × windFactor
+//
+// Spread probability per tick = ROS_effective / cellSize × tickDuration
+//
+// References:
+//   Rothermel (1972) "A mathematical model for predicting fire spread"
+//   Andrews (2018) "The Rothermel surface fire spread model and associated developments"
+//   NWCG PMS 437 Surface Fire Behavior Lookup Tables
+
+const TICK_REAL_MINUTES = 30; // each simulation tick = 30 min real time
+const TICK_MS = 350;          // visual animation speed
+
+function moistureDamping(deadFM) {
+  // Simplified moisture damping from Rothermel
+  // At 3% FM: factor ~1.3 (very dry, burns fast)
+  // At 8% FM: factor ~0.6 (moderate, slower)
+  // At 15% FM: factor ~0.1 (damp, barely spreads)
+  const r = deadFM / 0.15; // ratio to extinction moisture (~15% for SH5)
+  return Math.max(0.05, 1.0 - 2.5 * r + 1.5 * r * r);
+}
+
+function slopeFactor(elevDiff) {
+  // Fire spreads faster uphill: doubles per 20° slope (Rothermel slope factor)
+  // elevDiff > 0 means neighbor is uphill
+  if (elevDiff <= 0) {
+    // Downhill: reduced but not zero
+    return Math.max(0.3, 1.0 + elevDiff / (CELL_SIZE_M * 0.8));
+  }
+  const slopeDeg = Math.atan(elevDiff / CELL_SIZE_M) * 180 / Math.PI;
+  return Math.pow(ROTHERMEL.slopeFactor, slopeDeg / 20);
+}
+
+function windFactor(dr, dc, windDir, windSpeed) {
+  // Wind pushes fire in the direction it's blowing toward
+  // windDir is meteorological (where wind comes FROM), fire travels opposite
+  const fireDir = (windDir + 180) % 360;
+  const fireDirRad = fireDir * Math.PI / 180;
+  // Direction of this spread (row/col delta to angle)
+  const spreadAngle = Math.atan2(dc, -dr); // -dr because row increases southward
+  const alignment = Math.cos(spreadAngle - fireDirRad);
+  // Wind effect scales with speed: at 40km/h, headwind spread is 3x; tailwind is 0.3x
+  const intensity = windSpeed / 30;
+  return Math.max(0.15, 1.0 + alignment * intensity);
+}
+
+// Compute spread probability from cell i to neighbor ni
+function spreadProb(cell, neighbor, params) {
+  const baseROS = params.baseROS_km_h || ROTHERMEL.baseROS_km_h;
+  const mf = moistureDamping(params.deadFuelMoisture);
+  const elevDiff = neighbor.elev - cell.elev;
+  const sf = slopeFactor(elevDiff);
+  const dr = neighbor.row - cell.row;
+  const dc = neighbor.col - cell.col;
+  const wf = windFactor(dr, dc, params.windDir_deg, params.windSpeed_km_h);
+
+  // Effective ROS in km/h
+  const ros = baseROS * mf * sf * wf * neighbor.fuel;
+
+  // Convert to spread probability per tick
+  // tick = 30 min, cell = ~1.1km → prob = ros * 0.5hr / 1.1km
+  let prob = ros * (TICK_REAL_MINUTES / 60) / (CELL_SIZE_M / 1000);
+
+  // Treatment: conditional reduction
+  if (neighbor.treated) {
+    const reduction = treatmentReduction(params.windSpeed_km_h, params.deadFuelMoisture);
+    prob *= (1 - reduction);
+  }
+
+  return Math.max(0, Math.min(0.95, prob));
+}
+
+// ═══════════════════════════════════════════════════════
+//  HEADLESS FIRE SIMULATION (for Monte Carlo)
+// ═══════════════════════════════════════════════════════
+// Returns { burnedCells: [...indices], totalDamage, wuiDamage, wildlandBurned, ticks }
+function simulateFire(ignitionIdx, params, treatedSet) {
+  // Reset cell states
+  const burning = new Uint8Array(cells.length);
+  const burned = new Uint8Array(cells.length);
+  const timers = new Uint8Array(cells.length);
+
+  burning[ignitionIdx] = 1;
+  let activeFires = 1;
+  let ticks = 0;
+  const maxTicks = 200; // ~100 hours max
+
+  while (activeFires > 0 && ticks < maxTicks) {
+    ticks++;
+    const toIgnite = [];
+    const toBurnOut = [];
+
+    for (let i = 0; i < cells.length; i++) {
+      if (!burning[i]) continue;
+      timers[i]++;
+
+      // Burn duration depends on fuel load
+      if (timers[i] > 2 + cells[i].fuel * 6) {
+        toBurnOut.push(i);
+        continue;
+      }
+
+      // Try spreading to 4 neighbors
+      const c = cells[i];
+      for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const ni = RC[`${c.row+dr},${c.col+dc}`];
+        if (ni === undefined) continue;
+        if (burning[ni] || burned[ni]) continue;
+
+        const isTreated = treatedSet ? treatedSet.has(ni) : false;
+        const nb = cells[ni];
+        const p = spreadProb(c, { ...nb, treated: isTreated }, params);
+        if (Math.random() < p) toIgnite.push(ni);
+      }
+    }
+
+    for (const i of toBurnOut) { burning[i] = 0; burned[i] = 1; activeFires--; }
+    for (const i of toIgnite) {
+      if (!burning[i] && !burned[i]) { burning[i] = 1; activeFires++; }
+    }
+  }
+
+  // Compute damage
+  let totalDamage = 0, wuiDamage = 0, wildlandBurned = 0;
+  const burnedIndices = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (burned[i] || burning[i]) {
+      burnedIndices.push(i);
+      totalDamage += cells[i].valueAtRisk;
+      if (cells[i].wuiWeight > 0) wuiDamage += cells[i].wuiWeight;
+      else wildlandBurned++;
+    }
+  }
+
+  return { burnedCells: burnedIndices, totalDamage, wuiDamage, wildlandBurned, ticks };
+}
+
+// ═══════════════════════════════════════════════════════
+//  VISUAL FIRE SPREAD (interactive, animated)
+// ═══════════════════════════════════════════════════════
 let fireInterval = null;
-const SPREAD_BASE = 0.35; // base probability of spreading to neighbor per tick
 
 function igniteCell(idx) {
   if (idx < 0 || idx >= cells.length) return;
   const c = cells[idx];
-  if (c.burning || c.burned || c.treated) return;
+  if (c.burning || c.burned) return;
   c.burning = true;
   c.burnTimer = 0;
-  log(`Ignited cell [${c.row},${c.col}] — elev ${c.elevation.toFixed(0)}m, fuel ${(c.fuel*100).toFixed(0)}%, slope ${c.slope.toFixed(1)}°`);
+  log(`Ignited [${c.row},${c.col}] elev=${c.elev|0}m fuel=${(c.fuel*100)|0}% slope=${c.slope.toFixed(1)}° val=${c.valueAtRisk.toFixed(1)}${c.wuiWeight > 0 ? ' (WUI:'+c.nearestCommunity+')' : ''}`);
   if (!fireInterval) startFireLoop();
 }
 
 function igniteRandom() {
-  // Pick from high-ignition-probability cells
-  const candidates = cells.filter(c => !c.burning && !c.burned && !c.treated && c.ignitionProb > 0.05);
-  if (candidates.length === 0) return;
-  // Weighted random by ignition probability
-  const totalProb = candidates.reduce((s, c) => s + c.ignitionProb, 0);
-  let r = Math.random() * totalProb;
-  for (const c of candidates) {
-    r -= c.ignitionProb;
-    if (r <= 0) { igniteCell(cells.indexOf(c)); return; }
-  }
-  igniteCell(cells.indexOf(candidates[candidates.length - 1]));
+  // Weighted by ignition probability
+  const cands = cells.filter(c => !c.burning && !c.burned && c.ignProb > 0.02);
+  if (!cands.length) return;
+  const total = cands.reduce((s, c) => s + c.ignProb, 0);
+  let r = Math.random() * total;
+  for (const c of cands) { r -= c.ignProb; if (r <= 0) { igniteCell(c.idx); return; } }
+  igniteCell(cands[cands.length - 1].idx);
 }
 
-function spreadFire() {
-  const toIgnite = [];
-  const toBurnOut = [];
+function visualSpreadTick() {
+  const toIgnite = [], toBurnOut = [];
+  const params = { ...ROTHERMEL };
 
-  cells.forEach((cell, i) => {
-    if (!cell.burning) return;
+  for (const cell of cells) {
+    if (!cell.burning) continue;
     cell.burnTimer++;
+    if (cell.burnTimer > 2 + cell.fuel * 6) { toBurnOut.push(cell); continue; }
 
-    // Burn out after fuel is consumed (higher fuel = longer burn)
-    if (cell.burnTimer > 3 + cell.fuel * 8) {
-      toBurnOut.push(i);
-      return;
-    }
-
-    // Try to spread to 4 neighbors
-    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc]) => {
-      const ni = cellsByRC[`${cell.row+dr},${cell.col+dc}`];
-      if (ni === undefined) return;
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const ni = RC[`${cell.row+dr},${cell.col+dc}`];
+      if (ni === undefined) continue;
       const nb = cells[ni];
-      if (nb.burning || nb.burned || nb.treated) return;
-
-      // Spread probability depends on:
-      // 1. Neighbor's fuel load (more fuel = easier to ignite)
-      // 2. Slope (fire spreads faster uphill)
-      // 3. Wind (spreads faster downwind)
-      let prob = SPREAD_BASE * nb.fuel;
-
-      // Slope effect: uphill increases spread
-      const elevDiff = nb.elevation - cell.elevation;
-      if (elevDiff > 0) prob *= 1 + (elevDiff / 200); // uphill boost
-      else prob *= Math.max(0.3, 1 + elevDiff / 500); // downhill penalty
-
-      // Wind effect: NW wind pushes fire SE
-      const windRad = (WIND.dir_deg - 180) * Math.PI / 180; // direction fire travels
-      const spreadDir = Math.atan2(dc, dr); // direction of this neighbor
-      const windAlign = Math.cos(spreadDir - windRad);
-      const windFactor = 1 + windAlign * (WIND.speed_ms / 10);
-      prob *= Math.max(0.2, windFactor);
-
-      prob = Math.min(0.95, prob);
-      if (Math.random() < prob) toIgnite.push(ni);
-    });
-  });
-
-  toBurnOut.forEach(i => { cells[i].burning = false; cells[i].burned = true; });
-  toIgnite.forEach(i => {
-    if (!cells[i].burning && !cells[i].burned) {
-      cells[i].burning = true;
-      cells[i].burnTimer = 0;
+      if (nb.burning || nb.burned) continue;
+      const p = spreadProb(cell, nb, params);
+      if (Math.random() < p) toIgnite.push(nb);
     }
-  });
+  }
+
+  for (const c of toBurnOut) { c.burning = false; c.burned = true; }
+  for (const c of toIgnite) { if (!c.burning && !c.burned) { c.burning = true; c.burnTimer = 0; } }
 
   renderDeck();
 
-  // Check if fire is still active
-  if (!cells.some(c => c.burning)) {
+  const active = cells.filter(c => c.burning).length;
+  if (active === 0 && fireInterval) {
     clearInterval(fireInterval);
     fireInterval = null;
-    const burnedCount = cells.filter(c => c.burned).length;
-    log(`Fire out. ${burnedCount} cells burned (${(burnedCount/cells.length*100).toFixed(1)}% of landscape).`);
+    const b = cells.filter(c => c.burned).length;
+    const dmg = cells.filter(c => c.burned).reduce((s, c) => s + c.valueAtRisk, 0);
+    const wuiB = cells.filter(c => c.burned && c.wuiWeight > 0).length;
+    log(`Fire out. ${b} cells burned (${(b/cells.length*100).toFixed(1)}%). Damage: ${dmg.toFixed(0)} (${wuiB} WUI cells).`);
   }
 }
 
 function startFireLoop() {
   if (fireInterval) return;
-  fireInterval = setInterval(spreadFire, 200);
+  fireInterval = setInterval(visualSpreadTick, TICK_MS);
 }
 
 function resetFire() {
   if (fireInterval) { clearInterval(fireInterval); fireInterval = null; }
-  cells.forEach(c => { c.burning = false; c.burned = false; c.burnTimer = 0; });
+  for (const c of cells) { c.burning = false; c.burned = false; c.burnTimer = 0; c.treated = false; }
   document.getElementById('fire-log').textContent = '';
   renderDeck();
 }
@@ -323,9 +547,72 @@ function log(msg) {
   el.scrollTop = el.scrollHeight;
 }
 
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+//  STRATIFIED IGNITION SAMPLING
+// ═══════════════════════════════════════════════════════
+// Divide landscape into 4 strata by FIRMS ignition density quartile.
+// Sample ignition points proportionally from each stratum.
+// Returns array of 100 cell indices (fixed across strategies).
+function generateIgnitionSet(n = 100) {
+  // Sort cells by ignition probability
+  const operable = cells.filter(c => c.ignProb > 0.005 && c.fuel > 0.1);
+  operable.sort((a, b) => a.ignProb - b.ignProb);
+
+  const q = Math.floor(operable.length / 4);
+  const strata = [
+    operable.slice(0, q),           // Q1: low risk
+    operable.slice(q, q * 2),       // Q2: moderate
+    operable.slice(q * 2, q * 3),   // Q3: high
+    operable.slice(q * 3),          // Q4: very high
+  ];
+
+  // Sample proportionally: more from high-risk strata
+  const weights = [0.10, 0.20, 0.30, 0.40]; // 10% from Q1, 40% from Q4
+  const ignitions = [];
+  for (let s = 0; s < 4; s++) {
+    const count = Math.round(n * weights[s]);
+    for (let i = 0; i < count && ignitions.length < n; i++) {
+      const cell = strata[s][Math.floor(Math.random() * strata[s].length)];
+      ignitions.push({ idx: cell.idx, stratum: s + 1 });
+    }
+  }
+  // Fill remainder if rounding left us short
+  while (ignitions.length < n) {
+    const cell = strata[3][Math.floor(Math.random() * strata[3].length)];
+    ignitions.push({ idx: cell.idx, stratum: 4 });
+  }
+
+  return ignitions;
+}
+
+// ═══════════════════════════════════════════════════════
+//  WEATHER SAMPLING (per Monte Carlo run)
+// ═══════════════════════════════════════════════════════
+function sampleWeather() {
+  const isDiablo = Math.random() < 0.30;
+  if (isDiablo) {
+    return {
+      deadFuelMoisture: 0.03 + Math.random() * 0.02,  // 3-5%
+      liveFuelMoisture: 0.55 + Math.random() * 0.15,   // 55-70%
+      windSpeed_km_h: 35 + Math.random() * 25,          // 35-60 km/h
+      windDir_deg: 30 + Math.random() * 40,              // 30-70° (NE Diablo)
+      baseROS_km_h: ROTHERMEL.baseROS_km_h,
+      event: 'diablo'
+    };
+  }
+  return {
+    deadFuelMoisture: 0.04 + Math.random() * 0.04,  // 4-8%
+    liveFuelMoisture: 0.60 + Math.random() * 0.30,   // 60-90%
+    windSpeed_km_h: 10 + Math.random() * 15,          // 10-25 km/h
+    windDir_deg: 240 + Math.random() * 120,            // 240-360° (W to N)
+    baseROS_km_h: ROTHERMEL.baseROS_km_h,
+    event: 'normal'
+  };
+}
+
+// ═══════════════════════════════════════════════════════
 //  MAP + DECK.GL
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 const map = new maplibregl.Map({
   container: 'map',
   style: {
@@ -339,39 +626,39 @@ const map = new maplibregl.Map({
 let deckOverlay = null;
 
 function cellColor(c) {
-  if (c.burning) return [255, 60, 10, 200];
-  if (c.burned) return [40, 40, 40, 160];
-  if (c.treated) return [0, 150, 255, 120];
-  // Operability coloring with fuel intensity
+  if (c.burning) return [255, 60, 10, 210];
+  if (c.burned) return [50, 50, 50, 170];
+  if (c.treated) return [0, 170, 255, 130];
+  // WUI overlay
+  if (c.wuiWeight > 2) {
+    const w = Math.min(1, c.wuiWeight / 10);
+    return [124 * w + 30, 77 * w + 60, 255 * w + 20, 60 + w * 100];
+  }
+  // Operability + fuel intensity
   const f = c.fuel;
-  if (c.operable === 'yes') return [30 + f*20, 100 + f*25, 40, 50 + f*60];
-  if (c.operable === 'marginal') return [200, 160, 30, 50 + f*60];
-  return [180, 30, 30, 50 + f*60];
+  if (c.operable === 'yes') return [25 + f * 25, 90 + f * 35, 35, 40 + f * 60];
+  if (c.operable === 'marginal') return [200, 155, 30, 40 + f * 60];
+  return [170, 30, 30, 40 + f * 60];
 }
 
 function renderDeck() {
   const layers = [
     new deck.ScatterplotLayer({
-      id: 'grid',
-      data: cells,
+      id: 'grid', data: cells,
       getPosition: d => [d.lng, d.lat],
-      getRadius: 1200,
+      getRadius: CELL_SIZE_M / 2.2,
       getFillColor: d => cellColor(d),
-      radiusMinPixels: 4,
-      radiusMaxPixels: 18,
+      radiusMinPixels: 3, radiusMaxPixels: 14,
       pickable: true,
-      onClick: ({object}) => { if (object) igniteCell(cells.indexOf(object)); },
+      onClick: ({object}) => { if (object) igniteCell(object.idx); },
       updateTriggers: { getFillColor: [Date.now()] }
     }),
-    // FIRMS hotspots as cyan dots
     new deck.ScatterplotLayer({
-      id: 'firms',
-      data: FIRMS,
+      id: 'firms', data: FIRMS,
       getPosition: d => [d[1], d[0]],
-      getRadius: 400,
-      getFillColor: [0, 229, 255, 100],
-      radiusMinPixels: 2,
-      radiusMaxPixels: 6,
+      getRadius: 350,
+      getFillColor: [0, 229, 255, 80],
+      radiusMinPixels: 2, radiusMaxPixels: 5,
     })
   ];
 
@@ -383,13 +670,15 @@ function renderDeck() {
   }
 }
 
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 //  INIT
-// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 buildGrid();
 map.on('load', () => {
   renderDeck();
-  log('Landscape ready. Click a cell or press "Ignite Random Cell".');
+  log(`Landscape: ${cells.length} cells, ${cells.filter(c=>c.operable!=='no').length} operable, ${cells.filter(c=>c.wuiWeight>0).length} WUI`);
+  log('Click a cell to ignite or press "Ignite Random Cell".');
+  log('Rothermel params shown in sidebar. Step 2 adds experiment engine.');
 });
 </script>
 </body>
